@@ -9,9 +9,11 @@
   ],
   "scripts": {
     "dev": "concurrently -n API,ADMIN -c blue,magenta \"npm run dev -w @deutschflow/api\" \"npm run dev -w @deutschflow/admin\"",
-    "build": "npm run build -w @deutschflow/shared && npm run build -w @deutschflow/api && npm run build -w @deutschflow/admin",
+    "build": "npm run build -w @deutschflow/shared && npm run build -w @deutschflow/api && npm run build -w @deutschflow/admin && node scripts/copy-admin-dist.mjs",
     "typecheck": "npm run typecheck -w @deutschflow/shared && npm run typecheck -w @deutschflow/api && npm run typecheck -w @deutschflow/admin",
-    "lint": "npm run lint -w @deutschflow/api && npm run lint -w @deutschflow/admin"
+    "lint": "npm run lint -w @deutschflow/api && npm run lint -w @deutschflow/admin",
+    "build:admin": "npm run build -w @deutschflow/shared && npm run build -w @deutschflow/admin && node scripts/copy-admin-dist.mjs",
+    "build:api": "npm run build -w @deutschflow/shared && npm run build -w @deutschflow/api"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
