@@ -1,7 +1,7 @@
 {
   "name": "deutschflow-platform",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "DeutschFlow React admin + Node/Supabase backend for scalable multilingual content and LiD Test delivery.",
   "workspaces": [
     "apps/*",
@@ -18,7 +18,8 @@
     "build:single-domain": "npm run build",
     "start:single-domain": "node server.js",
     "start": "node server.js",
-    "hostinger:build": "npm run build"
+    "hostinger:build": "npm run build",
+    "hostinger:start": "node server.js"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

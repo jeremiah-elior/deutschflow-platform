@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import { asyncHandler, HttpError } from '../utils/http.js';
 import { supabaseAdmin } from '../config/supabase.js';
+import { configWarnings } from '../config/env.js';
 import { buildCourseLevelManifest } from '../services/courseService.js';
 import { getPublishedLiDManifest } from '../services/lidService.js';
 
 export const publicRoutes = Router();
 
 publicRoutes.get('/health', (_req, res) => {
-  res.json({ ok: true, service: 'deutschflow-api', time: new Date().toISOString() });
+  res.json({ ok: true, service: 'deutschflow-api', time: new Date().toISOString(), configWarnings });
 });
 
 publicRoutes.get('/v1/app/bootstrap', asyncHandler(async (req, res) => {
