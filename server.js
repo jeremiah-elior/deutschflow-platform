@@ -1,11 +1,11 @@
 // Hostinger root entry file for DeutschFlow single-domain deployment.
-// V63 diagnostic + auto-build entry. If runtime logs do not show V63, Hostinger is not running this GitHub commit.
+// V64 diagnostic + auto-build entry. Includes Supabase WebSocket transport fix for Node 20.
 const { existsSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { spawnSync } = require('node:child_process');
 
-const VERSION = 'V63_GITHUB_ACTIVE_2026_07_15';
+const VERSION = 'V64_WS_NODE20_FIX_ACTIVE_2026_07_15';
 const compiledServer = resolve(process.cwd(), 'apps/api/dist/server.js');
 const adminIndex = resolve(process.cwd(), 'dist/index.html');
 

@@ -1,8 +1,8 @@
 {
   "name": "deutschflow-platform",
   "private": true,
-  "version": "1.0.3",
-  "description": "DeutschFlow React admin + Node/Supabase backend for scalable multilingual content and LiD Test delivery.",
+  "version": "1.0.4",
+  "description": "DeutschFlow React admin + Node/Supabase backend for scalable multilingual content and LiD Test delivery. Hostinger v64 Node 20 ws fix.",
   "workspaces": [
     "apps/*",
     "packages/*"
