@@ -74,7 +74,10 @@ export async function upsertLanguage(input: z.infer<typeof LanguageInput>) {
 }
 
 export async function listCourses() {
-  const { data, error } = await supabaseAdmin.from('courses').select('*, levels:course_levels(*)').order('sort_order');
+  const { data, error } = await supabaseAdmin
+    .from('courses')
+    .select('*, levels:course_levels(*), categories:course_categories(*), series:course_series(*)')
+    .order('sort_order');
   if (error) throw new HttpError(500, 'courses_fetch_failed', error.message);
   return data;
 }
@@ -159,7 +162,7 @@ export async function buildCourseLevelManifest(courseSlug: string, levelSlug: st
 
   const { data: chapters, error: chapterError } = await supabaseAdmin
     .from('chapters')
-    .select('id,slug,number,title_json,description_json,chapter_assets(*)')
+    .select('id,slug,number,title_json,description_json,duration_seconds,is_premium,is_featured,transcript_de,notes_json,vocabulary_json,category:course_categories(id,name,icon,description),series:course_series(id,title,subtitle,cover_url),chapter_assets(*),chapter_translations(*),chapter_notes(*),chapter_transcripts(*),chapter_vocabulary(*,translations:chapter_vocabulary_translations(*)),chapter_videos(*),chapter_quiz_questions(*)')
     .eq('level_id', level.id)
     .eq('is_active', true)
     .order('number');
@@ -179,6 +182,22 @@ export async function buildCourseLevelManifest(courseSlug: string, levelSlug: st
       number: chapter.number,
       title: chapter.title_json ?? {},
       description: chapter.description_json ?? {},
+      durationSeconds: chapter.duration_seconds ?? 0,
+      isPremium: Boolean(chapter.is_premium),
+      isFeatured: Boolean(chapter.is_featured),
+      category: chapter.category ?? null,
+      series: chapter.series ?? null,
+      translations: (chapter.chapter_translations ?? []).filter((item: any) => item.language_code === languageCode),
+      notes: (chapter.chapter_notes ?? []).filter((item: any) => item.language_code === languageCode),
+      transcripts: (chapter.chapter_transcripts ?? []).filter((item: any) => item.language_code === languageCode || item.language_code === 'de'),
+      vocabulary: chapter.chapter_vocabulary ?? [],
+      videos: (chapter.chapter_videos ?? []).filter((item: any) => item.is_enabled),
+      quiz: (chapter.chapter_quiz_questions ?? []).filter((item: any) => item.is_active),
+      legacy: {
+        transcriptDe: chapter.transcript_de ?? null,
+        notes: chapter.notes_json ?? {},
+        vocabulary: chapter.vocabulary_json ?? null
+      },
       assets: (chapter.chapter_assets ?? [])
         .filter((asset: any) => asset.is_active && (!asset.language_code || asset.language_code === languageCode || asset.asset_type === 'cover'))
         .map((asset: any) => ({

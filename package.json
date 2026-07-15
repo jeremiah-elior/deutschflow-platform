@@ -13,7 +13,8 @@
     "typecheck": "npm run typecheck -w @deutschflow/shared && npm run typecheck -w @deutschflow/api && npm run typecheck -w @deutschflow/admin",
     "lint": "npm run lint -w @deutschflow/api && npm run lint -w @deutschflow/admin",
     "build:admin": "npm run build -w @deutschflow/shared && npm run build -w @deutschflow/admin && node scripts/copy-admin-dist.mjs",
-    "build:api": "npm run build -w @deutschflow/shared && npm run build -w @deutschflow/api"
+    "build:api": "npm run build -w @deutschflow/shared && npm run build -w @deutschflow/api",
+    "import:legacy": "node scripts/import-legacy-mysql.mjs"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

@@ -9,6 +9,11 @@ export function CoursesPage() {
   const [chapterForm, setChapterForm] = useState({ levelId: '', slug: 'chapter-01', number: 1, title: '{"en":"Chapter 01"}' });
   const [assetForm, setAssetForm] = useState({ chapterId: '', languageCode: 'te', assetType: 'audio', storagePath: '' });
   const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const run = async (action: () => Promise<void>) => {
+    setError('');
+    try { await action(); } catch (err) { setError(err instanceof Error ? err.message : 'Action failed'); }
+  };
 
   async function load() {
     const { data } = await api.get('/v1/admin/courses');
@@ -19,36 +24,47 @@ export function CoursesPage() {
 
   async function createCourse(event: FormEvent) {
     event.preventDefault();
-    await api.post('/v1/admin/courses', { slug: courseForm.slug, title: JSON.parse(courseForm.title), description: JSON.parse(courseForm.description) });
-    await load();
+    await run(async () => {
+      await api.post('/v1/admin/courses', { slug: courseForm.slug, title: JSON.parse(courseForm.title), description: JSON.parse(courseForm.description) });
+      await load();
+    });
   }
 
   async function createLevel(event: FormEvent) {
     event.preventDefault();
-    await api.post('/v1/admin/levels', { courseId: levelForm.courseId, slug: levelForm.slug, title: JSON.parse(levelForm.title) });
-    await load();
+    await run(async () => {
+      await api.post('/v1/admin/levels', { courseId: levelForm.courseId, slug: levelForm.slug, title: JSON.parse(levelForm.title) });
+      await load();
+    });
   }
 
   async function createChapter(event: FormEvent) {
     event.preventDefault();
-    await api.post('/v1/admin/chapters', { levelId: chapterForm.levelId, slug: chapterForm.slug, number: chapterForm.number, title: JSON.parse(chapterForm.title) });
-    await load();
+    await run(async () => {
+      await api.post('/v1/admin/chapters', { levelId: chapterForm.levelId, slug: chapterForm.slug, number: chapterForm.number, title: JSON.parse(chapterForm.title) });
+      await load();
+    });
   }
 
   async function saveAsset() {
-    await api.post('/v1/admin/chapter-assets', assetForm);
-    setMessage('Chapter asset saved. Publish the level manifest after changes.');
+    await run(async () => {
+      await api.post('/v1/admin/chapter-assets', assetForm);
+      setMessage('Chapter asset saved. Publish the level manifest after changes.');
+    });
   }
 
   async function publish(courseSlug: string, levelSlug: string) {
-    const { data } = await api.post(`/v1/admin/courses/${courseSlug}/levels/${levelSlug}/publish`, { languageCode: 'te' });
-    setMessage(`Published manifest: ${data.url}`);
+    await run(async () => {
+      const { data } = await api.post(`/v1/admin/courses/${courseSlug}/levels/${levelSlug}/publish`, { languageCode: 'te' });
+      setMessage(`Published manifest: ${data.url}`);
+    });
   }
 
   return (
     <section className="page">
       <div className="pageHeader"><div><h1>Courses</h1><p>Manage A1/A2/B1 chapters and language audio.</p></div></div>
       {message ? <div className="successBox">{message}</div> : null}
+      {error ? <div className="errorBox">{error}</div> : null}
       <div className="grid3">
         <form className="panel formStack" onSubmit={createCourse}>
           <h2>Course</h2>

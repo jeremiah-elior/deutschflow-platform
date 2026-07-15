@@ -7,6 +7,11 @@ export function LiDPage() {
   const [jsonPath, setJsonPath] = useState('');
   const [asset, setAsset] = useState({ assetType: 'image', languageCode: 'te', key: '', storagePath: '' });
   const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const run = async (action: () => Promise<void>) => {
+    setError('');
+    try { await action(); } catch (err) { setError(err instanceof Error ? err.message : 'Action failed'); }
+  };
 
   async function load() {
     const { data } = await api.get('/v1/admin/lid/catalogs');
@@ -15,22 +20,28 @@ export function LiDPage() {
   useEffect(() => { load(); }, []);
 
   async function importJson() {
-    const { data } = await api.post('/v1/admin/lid/import-json', {
-      storagePath: jsonPath,
-      title: 'BAMF 2025 Study Material'
+    await run(async () => {
+      const { data } = await api.post('/v1/admin/lid/import-json', {
+        storagePath: jsonPath,
+        title: 'BAMF 2025 Study Material'
+      });
+      setMessage(`Imported ${data.importedCards} LiD cards.`);
+      await load();
     });
-    setMessage(`Imported ${data.importedCards} LiD cards.`);
-    await load();
   }
 
   async function saveAsset() {
-    await api.post('/v1/admin/lid/assets', asset);
-    setMessage(`Saved LiD asset ${asset.key}.`);
+    await run(async () => {
+      await api.post('/v1/admin/lid/assets', asset);
+      setMessage(`Saved LiD asset ${asset.key}.`);
+    });
   }
 
   async function publish(lang: string) {
-    const { data } = await api.post('/v1/admin/lid/publish', { languageCode: lang });
-    setMessage(`Published LiD manifest: ${data.manifestUrl}`);
+    await run(async () => {
+      const { data } = await api.post('/v1/admin/lid/publish', { languageCode: lang });
+      setMessage(`Published LiD manifest: ${data.manifestUrl}`);
+    });
   }
 
   return (
@@ -42,6 +53,7 @@ export function LiDPage() {
         </div>
       </div>
       {message ? <div className="successBox">{message}</div> : null}
+      {error ? <div className="errorBox">{error}</div> : null}
       <div className="twoCol">
         <div className="panel formStack">
           <h2>1. Upload and import study JSON</h2>

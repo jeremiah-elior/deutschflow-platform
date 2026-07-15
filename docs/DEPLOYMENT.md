@@ -43,3 +43,31 @@ VITE_SUPABASE_ANON_KEY=YOUR_ANON_KEY
 
 Upload `seed/lid/bamf_2025_study_material_en_te.json` in Admin → LiD Test → upload JSON.
 Then click Import and Publish Telugu.
+
+## v58 note: Admin buttons and API URL
+
+The admin frontend can deploy to Hostinger/Vercel, but the Save/Upload/Publish buttons call the Node API.
+
+Deploy `apps/api` separately and set admin env:
+
+```env
+VITE_API_BASE_URL=https://YOUR_NODE_API_DOMAIN.com
+```
+
+The frontend normalizes this value. If you accidentally add `/v1`, it will strip the duplicate.
+
+Check API health:
+
+```text
+https://YOUR_NODE_API_DOMAIN.com/health
+```
+
+Expected:
+
+```json
+{ "ok": true, "service": "deutschflow-api" }
+```
+
+## v58 note: Legacy MySQL data
+
+See `LEGACY_IMPORT_GUIDE.md` to import `seed/legacy/u832879198_deutschflow.sql` into Supabase.

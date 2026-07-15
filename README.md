@@ -54,3 +54,25 @@ GET /v1/lid/manifest?lang=te
 ```
 
 Large files such as audio, video, images and LiD card packs are downloaded from Supabase Storage/CDN URLs and cached in the apps.
+
+## v58 legacy MySQL + admin button fix
+
+This package includes a compatibility import path for the old PHP/MySQL backend dump and clearer admin API error handling.
+
+### Important deploy note
+
+The React admin needs a running Node API. Set:
+
+```env
+VITE_API_BASE_URL=https://YOUR_NODE_API_DOMAIN.com
+```
+
+Then verify:
+
+```text
+https://YOUR_NODE_API_DOMAIN.com/health
+```
+
+### Old DB import
+
+See `LEGACY_IMPORT_GUIDE.md`.

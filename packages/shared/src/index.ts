@@ -103,6 +103,18 @@ export interface CourseLevelManifest {
     number: number;
     title: Record<string, string | null>;
     description?: Record<string, string | null> | null;
+    durationSeconds?: number | null;
+    isPremium?: boolean;
+    isFeatured?: boolean;
+    category?: Record<string, unknown> | null;
+    series?: Record<string, unknown> | null;
+    translations?: Array<Record<string, unknown>>;
+    notes?: Array<Record<string, unknown>>;
+    transcripts?: Array<Record<string, unknown>>;
+    vocabulary?: Array<Record<string, unknown>>;
+    videos?: Array<Record<string, unknown>>;
+    quiz?: Array<Record<string, unknown>>;
+    legacy?: Record<string, unknown>;
     assets: FileDescriptor[];
   }>;
 }
