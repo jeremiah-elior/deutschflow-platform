@@ -1,8 +1,8 @@
 {
   "name": "deutschflow-platform",
   "private": true,
-  "version": "1.0.8",
-  "description": "DeutschFlow Hostinger single-domain build with production admin workflow drawers, visible loading/saving states, full CRUD dashboards, and legacy content import.",
+  "version": "1.0.9",
+  "description": "DeutschFlow Hostinger single-domain build with production side-inspector admin workflow, table-first CRUD, visible loading states, and legacy content dashboards.",
   "workspaces": [
     "apps/*",
     "packages/*"

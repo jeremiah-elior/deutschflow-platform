@@ -171,3 +171,47 @@ button:disabled { cursor:not-allowed; opacity:.62; }
 .toastStack > div { box-shadow:0 18px 50px rgba(0,0,0,.12); margin:0; }
 @media (max-width: 1180px) { .managerHero { grid-template-columns:1fr; } .uploadStepper { grid-template-columns:repeat(2,1fr); } .formGrid3 { grid-template-columns:1fr 1fr; } }
 @media (max-width: 760px) { .drawerPanel { width:100%; } .formGrid2, .formGrid3, .uploadStepper { grid-template-columns:1fr; } .pageHeader { gap:14px; flex-direction:column; } }
+
+/* v69 production side inspector workflow */
+.coursesProductionPage { max-width: 1600px; }
+.stickyPageHeader { align-items: center; }
+.panelFlush { background: transparent; border: 0; box-shadow: none; padding: 0; margin-bottom: 18px; }
+.courseTabs { display:flex; gap:10px; border-bottom:1px solid #dfe8e1; }
+.courseTabs button { border:0; background:transparent; color:#526359; padding:14px 18px; font-weight:900; border-bottom:3px solid transparent; }
+.courseTabs button.active { color:#126b42; border-bottom-color:#126b42; }
+.assetWorkspace { display:grid; grid-template-columns:minmax(0,1fr) 440px; gap:18px; align-items:start; }
+.assetMainPanel { min-width:0; }
+.assetTopBar { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:18px; }
+.assetTopBar h2 { margin:0 0 4px; }
+.assetFilters { display:grid; grid-template-columns:minmax(220px, 1.4fr) repeat(4, minmax(130px, .8fr)) auto; gap:12px; align-items:center; margin-bottom:18px; }
+.searchControl { display:flex; align-items:center; gap:8px; border:1px solid #d7e2db; border-radius:12px; padding:0 12px; background:#fbfdfc; }
+.searchControl input { border:0; background:transparent; padding-left:0; }
+.searchControl input:focus { outline: none; }
+.productionTableWrap { max-height: 620px; }
+.selectedRow td { background:#f0faf4; }
+.noWrapActions { flex-wrap:nowrap; }
+.noWrapActions button { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+.paginationBar { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-top:16px; color:#66756b; }
+.paginationButtons { display:flex; align-items:center; gap:8px; }
+.paginationButtons button { border:1px solid #dbe6df; background:#fff; color:#163b2b; border-radius:10px; min-width:38px; height:38px; font-weight:900; }
+.paginationButtons button.active { background:#e9f7ee; color:#126b42; border-color:#bde4ca; }
+.sideInspector { position:sticky; top:18px; align-self:start; background:#fff; border:1px solid #dfe8e1; border-radius:24px; box-shadow:0 24px 70px rgba(33,72,48,.12); overflow:hidden; }
+.inspectorHeader { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; padding:22px; border-bottom:1px solid #e4eee8; }
+.inspectorHeader h2 { margin:0; font-size:22px; letter-spacing:-.03em; }
+.inspectorHeader p { margin:6px 0 0; color:#63746a; }
+.inspectorBody { padding:22px; display:grid; gap:16px; }
+.miniStepper { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding:18px 22px 0; }
+.miniStepper div { border:1px solid #e1ece6; border-radius:14px; padding:10px; background:#fbfdfc; }
+.miniStepper div.active, .miniStepper div.done { background:#eef9f2; border-color:#bde6ca; }
+.miniStepper strong { display:block; color:#16633f; font-size:12px; }
+.miniStepper span { display:block; color:#68776f; font-size:11px; margin-top:4px; }
+.detailCard { background:#f9fcfa; border:1px solid #e1ece6; border-radius:18px; padding:16px; display:grid; gap:10px; }
+.detailCard span { color:#506057; }
+.asLink { text-align:center; display:inline-block; }
+.inspectorStatus { margin-top:0; }
+.inspectorActions { display:grid; grid-template-columns:1fr; gap:10px; }
+.inspectorHelp { margin:0; }
+.tableLoading { border:1px solid #e2eee7; background:#f8fcf9; color:#496156; border-radius:16px; padding:18px; margin-bottom:12px; font-weight:800; }
+@media (max-width: 1400px) { .assetWorkspace { grid-template-columns:minmax(0,1fr) 390px; } .assetFilters { grid-template-columns:1fr 1fr 1fr; } }
+@media (max-width: 1100px) { .assetWorkspace { grid-template-columns:1fr; } .sideInspector { position:static; } }
+@media (max-width: 760px) { .assetTopBar, .paginationBar { flex-direction:column; align-items:stretch; } .assetFilters, .miniStepper { grid-template-columns:1fr; } }
