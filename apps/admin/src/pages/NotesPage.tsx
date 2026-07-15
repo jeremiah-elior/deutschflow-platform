@@ -1,48 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { StatCard } from '../components/StatCard';
+import { chapterLabel } from '../utils/adminHelpers';
 
 export function NotesPage() {
   const [notes, setNotes] = useState<any[]>([]);
+  const [options, setOptions] = useState<any>({ chapters: [], languages: [] });
   const [language, setLanguage] = useState('');
   const [error, setError] = useState('');
-
-  function load() {
-    setError('');
-    api.get('/v1/admin/notes', { params: { language: language || undefined } })
-      .then((res) => setNotes(res.data.notes ?? []))
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load notes'));
-  }
-
+  const [message, setMessage] = useState('');
+  const [form, setForm] = useState({ id: '', chapterId: '', languageCode: 'te', content: '' });
+  async function load() { setError(''); try { const [noteRes, optionRes] = await Promise.all([api.get('/v1/admin/notes', { params: { language: language || undefined } }), api.get('/v1/admin/content-options')]); setNotes(noteRes.data.notes ?? []); setOptions(optionRes.data ?? { chapters: [], languages: [] }); } catch (err) { setError(err instanceof Error ? err.message : 'Failed to load notes'); } }
   useEffect(() => { load(); }, []);
   const languages = useMemo(() => Array.from(new Set(notes.map((item) => item.languageCode).filter(Boolean))).sort(), [notes]);
-
-  return (
-    <section className="page widePage">
-      <div className="pageHeader"><div><h1>Notes Dashboard</h1><p>Study note blocks imported from the old lesson_notes table.</p></div></div>
-      {error ? <div className="errorBox">{error}</div> : null}
-      <div className="statsGrid">
-        <StatCard title="Notes" value={notes.length} caption="Filtered records" />
-        <StatCard title="Languages" value={languages.length} caption="Note languages" />
-        <StatCard title="Source" value="Legacy" caption="Old DB import" />
-        <StatCard title="Editable" value="Next" caption="Preview now" />
-      </div>
-      <div className="panel toolbarPanel">
-        <select value={language} onChange={(e) => setLanguage(e.target.value)}>
-          <option value="">All languages</option>
-          {languages.map((item) => <option key={item} value={item}>{item}</option>)}
-        </select>
-        <button className="primaryButton" onClick={load}>Apply</button>
-      </div>
-      <div className="cardGrid">
-        {notes.map((note) => (
-          <div className="panel noteCard" key={note.id}>
-            <div className="sectionTitle"><h2>{note.chapter?.title ?? 'Untitled chapter'}</h2><span>{note.languageCode}</span></div>
-            <p>{note.content}</p>
-            <small>{note.chapter?.level ?? ''} · {note.chapter?.slug ?? ''}</small>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
+  function edit(note: any) { setForm({ id: note.id, chapterId: note.chapter?.id ?? '', languageCode: note.languageCode, content: note.content }); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  async function save(event: FormEvent) { event.preventDefault(); setError(''); setMessage(''); try { const body = { chapterId: form.chapterId, languageCode: form.languageCode, content: form.content }; if (form.id) await api.patch(`/v1/admin/notes/${form.id}`, body); else await api.post('/v1/admin/notes', body); setMessage(form.id ? 'Note updated.' : 'Note saved.'); setForm({ id: '', chapterId: form.chapterId, languageCode: form.languageCode, content: '' }); await load(); } catch (err) { setError(err instanceof Error ? err.message : 'Save failed'); } }
+  async function remove(id: string) { if (!confirm('Delete this note?')) return; try { await api.delete(`/v1/admin/notes/${id}`); setMessage('Note deleted.'); await load(); } catch (err) { setError(err instanceof Error ? err.message : 'Delete failed'); } }
+  return <section className="page widePage"><div className="pageHeader"><div><h1>Notes Dashboard</h1><p>View, add, edit, and delete study notes by chapter/language.</p></div></div>{message ? <div className="successBox">{message}</div> : null}{error ? <div className="errorBox">{error}</div> : null}<div className="statsGrid"><StatCard title="Notes" value={notes.length} caption="Filtered records" /><StatCard title="Languages" value={languages.length} caption="Note languages" /><StatCard title="Mode" value="CRUD" caption="Create/edit/delete" /><StatCard title="Source" value="Legacy" caption="Old DB import" /></div>
+  <form className="panel formStack" onSubmit={save}><div className="sectionTitle"><h2>{form.id ? 'Edit note' : 'Add note'}</h2><span>Pick chapter and language.</span></div><div className="smartUploadGrid"><label>Chapter<select value={form.chapterId} onChange={(e) => setForm({ ...form, chapterId: e.target.value })}><option value="">Select chapter</option>{options.chapters.map((chapter: any) => <option key={chapter.id} value={chapter.id}>{chapterLabel(chapter)}</option>)}</select></label><label>Language<select value={form.languageCode} onChange={(e) => setForm({ ...form, languageCode: e.target.value })}>{options.languages.map((lang: any) => <option key={lang.code} value={lang.code}>{lang.name} ({lang.code})</option>)}</select></label></div><label>Note content<textarea className="largeTextarea" value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} /></label><div className="buttonRow"><button className="primaryButton">{form.id ? 'Update note' : 'Save note'}</button>{form.id ? <button type="button" onClick={() => setForm({ id: '', chapterId: '', languageCode: 'te', content: '' })}>Cancel edit</button> : null}</div></form>
+  <div className="panel toolbarPanel"><select value={language} onChange={(e) => setLanguage(e.target.value)}><option value="">All languages</option>{languages.map((item) => <option key={item as string} value={item as string}>{item as string}</option>)}</select><button className="primaryButton" onClick={load}>Apply</button></div><div className="cardGrid">{notes.map((note) => <div className="panel noteCard" key={note.id}><div className="sectionTitle"><h2>{note.chapter?.title ?? 'Untitled chapter'}</h2><span>{note.languageCode}</span></div><p>{note.content}</p><small>{note.chapter?.level ?? ''} · {note.chapter?.slug ?? ''}</small><div className="buttonRow"><button onClick={() => edit(note)}>Edit</button><button className="dangerButton" onClick={() => remove(note.id)}>Delete</button></div></div>)}</div></section>;
 }

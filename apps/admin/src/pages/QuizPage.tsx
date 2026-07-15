@@ -1,44 +1,19 @@
-import { useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { StatCard } from '../components/StatCard';
+import { chapterLabel, jsonText, safeJsonParse } from '../utils/adminHelpers';
 
 export function QuizPage() {
   const [quiz, setQuiz] = useState<any[]>([]);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    api.get('/v1/admin/quiz')
-      .then((res) => setQuiz(res.data.quiz ?? []))
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load quiz'));
-  }, []);
-
-  return (
-    <section className="page widePage">
-      <div className="pageHeader"><div><h1>Quiz Dashboard</h1><p>Practice questions imported from the old DB.</p></div></div>
-      {error ? <div className="errorBox">{error}</div> : null}
-      <div className="statsGrid">
-        <StatCard title="Questions" value={quiz.length} caption="Imported quiz records" />
-        <StatCard title="Active" value={quiz.filter((item) => item.is_active).length} caption="Visible questions" />
-        <StatCard title="Sources" value={new Set(quiz.map((item) => item.source_table)).size} caption="Legacy tables" />
-        <StatCard title="Correct Keys" value={new Set(quiz.map((item) => item.correct_option)).size} caption="Answer variants" />
-      </div>
-      <div className="panel tablePanel">
-        <table className="dataTable">
-          <thead><tr><th>Question</th><th>Options</th><th>Answer</th><th>Chapter</th><th>Status</th></tr></thead>
-          <tbody>
-            {quiz.map((item) => (
-              <tr key={item.id}>
-                <td><strong>{item.question}</strong><small>{item.source_table} · Legacy ID: {item.legacy_id ?? '—'}</small></td>
-                <td><small>A: {item.options_json?.a ?? '—'}<br />B: {item.options_json?.b ?? '—'}<br />C: {item.options_json?.c ?? '—'}<br />D: {item.options_json?.d ?? '—'}</small></td>
-                <td><span className="answerKey">{String(item.correct_option ?? '').toUpperCase()}</span></td>
-                <td>{item.chapter?.title ?? '—'}<small>{item.chapter?.level ?? ''}</small></td>
-                <td><span className={item.is_active ? 'statusBadge good' : 'statusBadge warn'}>{item.is_active ? 'Active' : 'Off'}</span></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!quiz.length ? <p className="muted">No quiz questions found.</p> : null}
-      </div>
-    </section>
-  );
+  const [options, setOptions] = useState<any>({ chapters: [] });
+  const [error, setError] = useState(''); const [message, setMessage] = useState('');
+  const [form, setForm] = useState({ id: '', chapterId: '', question: '', options: '{"a":"","b":"","c":"","d":""}', correctOption: 'a', explanation: '', isActive: true, sortOrder: 0 });
+  async function load() { setError(''); try { const [quizRes, optionRes] = await Promise.all([api.get('/v1/admin/quiz'), api.get('/v1/admin/content-options')]); setQuiz(quizRes.data.quiz ?? []); setOptions(optionRes.data ?? { chapters: [] }); } catch (err) { setError(err instanceof Error ? err.message : 'Failed to load quiz'); } }
+  useEffect(() => { load(); }, []);
+  function edit(item: any) { setForm({ id: item.id, chapterId: item.chapter?.id ?? '', question: item.question ?? '', options: jsonText(item.options_json), correctOption: item.correct_option ?? 'a', explanation: item.explanation ?? '', isActive: Boolean(item.is_active), sortOrder: item.sort_order ?? 0 }); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  async function save(event: FormEvent) { event.preventDefault(); setError(''); setMessage(''); try { const body = { chapterId: form.chapterId, question: form.question, options: safeJsonParse(form.options), correctOption: form.correctOption, explanation: form.explanation || null, isActive: form.isActive, sortOrder: form.sortOrder }; if (form.id) await api.patch(`/v1/admin/quiz/${form.id}`, body); else await api.post('/v1/admin/quiz', body); setMessage(form.id ? 'Question updated.' : 'Question added.'); setForm({ id: '', chapterId: form.chapterId, question: '', options: '{"a":"","b":"","c":"","d":""}', correctOption: 'a', explanation: '', isActive: true, sortOrder: 0 }); await load(); } catch (err) { setError(err instanceof Error ? err.message : 'Save failed'); } }
+  async function remove(id: string) { if (!confirm('Delete this question?')) return; try { await api.delete(`/v1/admin/quiz/${id}`); setMessage('Question deleted.'); await load(); } catch (err) { setError(err instanceof Error ? err.message : 'Delete failed'); } }
+  return <section className="page widePage"><div className="pageHeader"><div><h1>Quiz Dashboard</h1><p>View, add, edit, and delete practice questions.</p></div></div>{message ? <div className="successBox">{message}</div> : null}{error ? <div className="errorBox">{error}</div> : null}<div className="statsGrid"><StatCard title="Questions" value={quiz.length} caption="Quiz records" /><StatCard title="Active" value={quiz.filter((item) => item.is_active).length} caption="Visible questions" /><StatCard title="Sources" value={new Set(quiz.map((item) => item.source_table)).size} caption="Legacy tables" /><StatCard title="Mode" value="CRUD" caption="Create/edit/delete" /></div>
+  <form className="panel formStack" onSubmit={save}><div className="sectionTitle"><h2>{form.id ? 'Edit question' : 'Add question'}</h2><span>Options are JSON so we can support any app format.</span></div><label>Chapter<select value={form.chapterId} onChange={(e) => setForm({ ...form, chapterId: e.target.value })}><option value="">Select chapter</option>{options.chapters.map((chapter: any) => <option key={chapter.id} value={chapter.id}>{chapterLabel(chapter)}</option>)}</select></label><label>Question<textarea value={form.question} onChange={(e) => setForm({ ...form, question: e.target.value })} /></label><div className="smartUploadGrid"><label>Correct option<input value={form.correctOption} onChange={(e) => setForm({ ...form, correctOption: e.target.value })} /></label><label>Sort order<input type="number" value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) })} /></label></div><label>Options JSON<textarea value={form.options} onChange={(e) => setForm({ ...form, options: e.target.value })} /></label><label>Explanation<textarea value={form.explanation} onChange={(e) => setForm({ ...form, explanation: e.target.value })} /></label><label className="inlineCheck"><input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} /> Active</label><div className="buttonRow"><button className="primaryButton">{form.id ? 'Update question' : 'Add question'}</button>{form.id ? <button type="button" onClick={() => setForm({ id: '', chapterId: '', question: '', options: '{"a":"","b":"","c":"","d":""}', correctOption: 'a', explanation: '', isActive: true, sortOrder: 0 })}>Cancel edit</button> : null}</div></form>
+  <div className="panel tablePanel"><table className="dataTable"><thead><tr><th>Question</th><th>Options</th><th>Answer</th><th>Chapter</th><th>Status</th><th>Actions</th></tr></thead><tbody>{quiz.map((item) => <tr key={item.id}><td><strong>{item.question}</strong><small>{item.source_table} · Legacy ID: {item.legacy_id ?? '—'}</small></td><td><small>A: {item.options_json?.a ?? '—'}<br />B: {item.options_json?.b ?? '—'}<br />C: {item.options_json?.c ?? '—'}<br />D: {item.options_json?.d ?? '—'}</small></td><td><span className="answerKey">{String(item.correct_option ?? '').toUpperCase()}</span></td><td>{item.chapter?.title ?? '—'}<small>{item.chapter?.level ?? ''}</small></td><td><span className={item.is_active ? 'statusBadge good' : 'statusBadge warn'}>{item.is_active ? 'Active' : 'Off'}</span></td><td><div className="rowActions"><button onClick={() => edit(item)}>Edit</button><button className="dangerButton" onClick={() => remove(item.id)}>Delete</button></div></td></tr>)}</tbody></table>{!quiz.length ? <p className="muted">No quiz questions found.</p> : null}</div></section>;
 }

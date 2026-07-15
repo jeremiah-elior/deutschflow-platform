@@ -107,3 +107,20 @@ pre { background:#0c1f16; color:#dbffe8; padding:16px; border-radius:16px; overf
 .answerKey { display:inline-grid; place-items:center; width:34px; height:34px; border-radius:12px; background:#126b42; color:white; font-weight:900; }
 @media (max-width: 1180px) { .megaStats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .toolbarPanel { grid-template-columns: 1fr; } .miniStats { grid-template-columns: repeat(2,1fr); } .cardGrid { grid-template-columns: 1fr; } }
 @media (max-width: 960px) { .heroHeader { border-radius: 22px; padding: 22px; } .megaStats { grid-template-columns: 1fr; } }
+
+/* v67 human admin flow */
+.smartUploadGrid { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items:end; }
+.smartUploadGrid label { display:flex; flex-direction: column; gap:6px; font-size:14px; color:#4e5b53; }
+.compactTwoCol { grid-template-columns: minmax(280px, .8fr) 1.2fr; margin-top: 16px; }
+.assetPreview { background:#f8fcf9; border:1px solid #e2eee7; border-radius:18px; padding:18px; display:flex; flex-direction:column; gap:8px; }
+.assetPreview p { margin:0 0 8px; color:#4e5b53; }
+.pathText { word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.actionHeader { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+.rowActions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.rowActions button, .buttonRow button:not(.primaryButton), .dangerButton { border:0; border-radius:12px; background:#eef7f1; color:#145d3a; padding:9px 11px; font-weight:800; }
+.rowActions .dangerButton, .dangerButton { background:#fff0f0; color:#9b2424; border:1px solid #f2b4b4; }
+.compactDataTable { min-width: 680px; }
+.largeTextarea { min-height: 180px; }
+.editPanel { border:1px solid #cde6d6; background:linear-gradient(180deg,#ffffff,#f8fcf9); }
+@media (max-width: 1180px) { .smartUploadGrid { grid-template-columns: 1fr 1fr; } .compactTwoCol { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .smartUploadGrid { grid-template-columns: 1fr; } }

@@ -1,43 +1,19 @@
-import { useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { StatCard } from '../components/StatCard';
+import { chapterLabel } from '../utils/adminHelpers';
 
 export function VideosPage() {
   const [videos, setVideos] = useState<any[]>([]);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    api.get('/v1/admin/videos')
-      .then((res) => setVideos(res.data.videos ?? []))
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load videos'));
-  }, []);
-
-  return (
-    <section className="page widePage">
-      <div className="pageHeader"><div><h1>Videos Dashboard</h1><p>Lesson video records and preview status.</p></div></div>
-      {error ? <div className="errorBox">{error}</div> : null}
-      <div className="statsGrid">
-        <StatCard title="Videos" value={videos.length} caption="Imported records" />
-        <StatCard title="Enabled" value={videos.filter((item) => item.is_enabled).length} caption="Visible to app" />
-        <StatCard title="Preview" value={videos.filter((item) => item.show_as_preview).length} caption="Free preview" />
-        <StatCard title="Premium" value={videos.filter((item) => item.is_premium).length} caption="Premium videos" />
-      </div>
-      <div className="panel tablePanel">
-        <table className="dataTable">
-          <thead><tr><th>Video</th><th>Chapter</th><th>URL</th><th>Status</th></tr></thead>
-          <tbody>
-            {videos.map((video) => (
-              <tr key={video.id}>
-                <td><strong>{video.title}</strong><small>{video.duration_seconds ?? 0}s · Legacy ID: {video.legacy_id ?? '—'}</small></td>
-                <td>{video.chapter?.title ?? '—'}<small>{video.chapter?.level ?? ''}</small></td>
-                <td><a className="tableLink" href={video.video_url} target="_blank" rel="noreferrer">Open video</a></td>
-                <td><span className={video.is_enabled ? 'statusBadge good' : 'statusBadge warn'}>{video.is_enabled ? 'Enabled' : 'Off'}</span>{video.is_premium ? <span className="statusBadge premium">Premium</span> : null}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!videos.length ? <p className="muted">No videos found.</p> : null}
-      </div>
-    </section>
-  );
+  const [options, setOptions] = useState<any>({ chapters: [] });
+  const [error, setError] = useState(''); const [message, setMessage] = useState('');
+  const [form, setForm] = useState({ id: '', chapterId: '', title: 'Video Overview', videoUrl: '', thumbnailUrl: '', durationSeconds: 0, isEnabled: true, isPremium: false, showAsPreview: false, sortOrder: 0 });
+  async function load() { setError(''); try { const [videoRes, optionRes] = await Promise.all([api.get('/v1/admin/videos'), api.get('/v1/admin/content-options')]); setVideos(videoRes.data.videos ?? []); setOptions(optionRes.data ?? { chapters: [] }); } catch (err) { setError(err instanceof Error ? err.message : 'Failed to load videos'); } }
+  useEffect(() => { load(); }, []);
+  function edit(video: any) { setForm({ id: video.id, chapterId: video.chapter?.id ?? '', title: video.title ?? '', videoUrl: video.video_url ?? '', thumbnailUrl: video.thumbnail_url ?? '', durationSeconds: video.duration_seconds ?? 0, isEnabled: Boolean(video.is_enabled), isPremium: Boolean(video.is_premium), showAsPreview: Boolean(video.show_as_preview), sortOrder: video.sort_order ?? 0 }); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  async function save(event: FormEvent) { event.preventDefault(); setError(''); setMessage(''); try { const body = { chapterId: form.chapterId, title: form.title, videoUrl: form.videoUrl, thumbnailUrl: form.thumbnailUrl || null, durationSeconds: form.durationSeconds, isEnabled: form.isEnabled, isPremium: form.isPremium, showAsPreview: form.showAsPreview, sortOrder: form.sortOrder }; if (form.id) await api.patch(`/v1/admin/videos/${form.id}`, body); else await api.post('/v1/admin/videos', body); setMessage(form.id ? 'Video updated.' : 'Video added.'); setForm({ id: '', chapterId: form.chapterId, title: 'Video Overview', videoUrl: '', thumbnailUrl: '', durationSeconds: 0, isEnabled: true, isPremium: false, showAsPreview: false, sortOrder: 0 }); await load(); } catch (err) { setError(err instanceof Error ? err.message : 'Save failed'); } }
+  async function remove(id: string) { if (!confirm('Delete this video?')) return; try { await api.delete(`/v1/admin/videos/${id}`); setMessage('Video deleted.'); await load(); } catch (err) { setError(err instanceof Error ? err.message : 'Delete failed'); } }
+  return <section className="page widePage"><div className="pageHeader"><div><h1>Videos Dashboard</h1><p>View, add, edit, and delete lesson video records.</p></div></div>{message ? <div className="successBox">{message}</div> : null}{error ? <div className="errorBox">{error}</div> : null}<div className="statsGrid"><StatCard title="Videos" value={videos.length} caption="Records" /><StatCard title="Enabled" value={videos.filter((item) => item.is_enabled).length} caption="Visible to app" /><StatCard title="Preview" value={videos.filter((item) => item.show_as_preview).length} caption="Free preview" /><StatCard title="Premium" value={videos.filter((item) => item.is_premium).length} caption="Premium videos" /></div>
+  <form className="panel formStack" onSubmit={save}><div className="sectionTitle"><h2>{form.id ? 'Edit video' : 'Add video'}</h2><span>Pick chapter from dropdown.</span></div><div className="smartUploadGrid"><label>Chapter<select value={form.chapterId} onChange={(e) => setForm({ ...form, chapterId: e.target.value })}><option value="">Select chapter</option>{options.chapters.map((chapter: any) => <option key={chapter.id} value={chapter.id}>{chapterLabel(chapter)}</option>)}</select></label><label>Title<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label><label>Video URL<input value={form.videoUrl} onChange={(e) => setForm({ ...form, videoUrl: e.target.value })} /></label><label>Thumbnail URL<input value={form.thumbnailUrl} onChange={(e) => setForm({ ...form, thumbnailUrl: e.target.value })} /></label><label>Duration seconds<input type="number" value={form.durationSeconds} onChange={(e) => setForm({ ...form, durationSeconds: Number(e.target.value) })} /></label><label>Sort order<input type="number" value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) })} /></label></div><div className="buttonRow"><label className="inlineCheck"><input type="checkbox" checked={form.isEnabled} onChange={(e) => setForm({ ...form, isEnabled: e.target.checked })} /> Enabled</label><label className="inlineCheck"><input type="checkbox" checked={form.isPremium} onChange={(e) => setForm({ ...form, isPremium: e.target.checked })} /> Premium</label><label className="inlineCheck"><input type="checkbox" checked={form.showAsPreview} onChange={(e) => setForm({ ...form, showAsPreview: e.target.checked })} /> Preview</label></div><div className="buttonRow"><button className="primaryButton">{form.id ? 'Update video' : 'Add video'}</button>{form.id ? <button type="button" onClick={() => setForm({ id: '', chapterId: '', title: 'Video Overview', videoUrl: '', thumbnailUrl: '', durationSeconds: 0, isEnabled: true, isPremium: false, showAsPreview: false, sortOrder: 0 })}>Cancel edit</button> : null}</div></form>
+  <div className="panel tablePanel"><table className="dataTable"><thead><tr><th>Video</th><th>Chapter</th><th>URL</th><th>Status</th><th>Actions</th></tr></thead><tbody>{videos.map((video) => <tr key={video.id}><td><strong>{video.title}</strong><small>{video.duration_seconds ?? 0}s · Legacy ID: {video.legacy_id ?? '—'}</small></td><td>{video.chapter?.title ?? '—'}<small>{video.chapter?.level ?? ''}</small></td><td>{video.video_url ? <a className="tableLink" href={video.video_url} target="_blank" rel="noreferrer">Open video</a> : '—'}</td><td><span className={video.is_enabled ? 'statusBadge good' : 'statusBadge warn'}>{video.is_enabled ? 'Enabled' : 'Off'}</span>{video.is_premium ? <span className="statusBadge premium">Premium</span> : null}</td><td><div className="rowActions"><button onClick={() => edit(video)}>Edit</button><button className="dangerButton" onClick={() => remove(video.id)}>Delete</button></div></td></tr>)}</tbody></table>{!videos.length ? <p className="muted">No videos found.</p> : null}</div></section>;
 }

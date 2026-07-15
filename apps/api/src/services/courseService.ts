@@ -126,7 +126,7 @@ export async function createChapter(input: z.infer<typeof ChapterInput>) {
 
 export async function saveChapterAsset(input: z.infer<typeof ChapterAssetInput>) {
   const parsed = ChapterAssetInput.parse(input);
-  const { data, error } = await supabaseAdmin.from('chapter_assets').insert({
+  const { data, error } = await supabaseAdmin.from('chapter_assets').upsert({
     chapter_id: parsed.chapterId,
     language_code: parsed.languageCode,
     asset_type: parsed.assetType,
@@ -137,7 +137,7 @@ export async function saveChapterAsset(input: z.infer<typeof ChapterAssetInput>)
     sha256: parsed.sha256 ?? null,
     version: parsed.version,
     is_active: parsed.isActive
-  }).select().single();
+  }, { onConflict: 'chapter_id,asset_type,language_code' }).select().single();
   if (error) throw new HttpError(500, 'chapter_asset_save_failed', error.message);
   return data;
 }

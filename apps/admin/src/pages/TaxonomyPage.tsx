@@ -1,41 +1,23 @@
-import { useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { StatCard } from '../components/StatCard';
+import { labelFromJson } from '../utils/adminHelpers';
 
 export function TaxonomyPage() {
   const [data, setData] = useState<any>({ categories: [], series: [] });
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    api.get('/v1/admin/content-taxonomy')
-      .then((res) => setData(res.data))
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load taxonomy'));
-  }, []);
-
-  return (
-    <section className="page widePage">
-      <div className="pageHeader"><div><h1>Categories & Series</h1><p>Legacy course categories and content series used by chapters.</p></div></div>
-      {error ? <div className="errorBox">{error}</div> : null}
-      <div className="statsGrid">
-        <StatCard title="Categories" value={data.categories?.length ?? 0} caption="Lesson groupings" />
-        <StatCard title="Series" value={data.series?.length ?? 0} caption="Featured pathways" />
-        <StatCard title="Source" value="Legacy" caption="Old DB import" />
-        <StatCard title="Course" value="German" caption="Mapped course" />
-      </div>
-      <div className="twoCol">
-        <div className="panel tablePanel">
-          <h2>Categories</h2>
-          <table className="dataTable"><thead><tr><th>Name</th><th>Icon</th><th>Status</th></tr></thead><tbody>
-            {(data.categories ?? []).map((item: any) => <tr key={item.id}><td><strong>{item.name}</strong><small>{item.description ?? ''}</small></td><td>{item.icon ?? '—'}</td><td><span className={item.is_active ? 'statusBadge good' : 'statusBadge warn'}>{item.is_active ? 'Active' : 'Off'}</span></td></tr>)}
-          </tbody></table>
-        </div>
-        <div className="panel tablePanel">
-          <h2>Series</h2>
-          <table className="dataTable"><thead><tr><th>Title</th><th>Subtitle</th><th>Status</th></tr></thead><tbody>
-            {(data.series ?? []).map((item: any) => <tr key={item.id}><td><strong>{item.title}</strong><small>{item.description ?? ''}</small></td><td>{item.subtitle ?? '—'}</td><td><span className={item.is_active ? 'statusBadge good' : 'statusBadge warn'}>{item.is_active ? 'Active' : 'Off'}</span>{item.is_featured ? <span className="statusBadge premium">Featured</span> : null}</td></tr>)}
-          </tbody></table>
-        </div>
-      </div>
-    </section>
-  );
+  const [options, setOptions] = useState<any>({ courses: [] });
+  const [error, setError] = useState(''); const [message, setMessage] = useState('');
+  const [category, setCategory] = useState({ id: '', courseId: '', name: '', icon: '', description: '', isActive: true, sortOrder: 0 });
+  const [series, setSeries] = useState({ id: '', courseId: '', title: '', subtitle: '', description: '', coverUrl: '', isFeatured: false, isActive: true });
+  async function load() { setError(''); try { const [taxRes, optionRes] = await Promise.all([api.get('/v1/admin/content-taxonomy'), api.get('/v1/admin/content-options')]); setData(taxRes.data); setOptions(optionRes.data ?? { courses: [] }); } catch (err) { setError(err instanceof Error ? err.message : 'Failed to load taxonomy'); } }
+  useEffect(() => { load(); }, []);
+  function editCategory(item: any) { setCategory({ id: item.id, courseId: item.course_id, name: item.name ?? '', icon: item.icon ?? '', description: item.description ?? '', isActive: Boolean(item.is_active), sortOrder: item.sort_order ?? 0 }); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  function editSeries(item: any) { setSeries({ id: item.id, courseId: item.course_id, title: item.title ?? '', subtitle: item.subtitle ?? '', description: item.description ?? '', coverUrl: item.cover_url ?? '', isFeatured: Boolean(item.is_featured), isActive: Boolean(item.is_active) }); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  async function saveCategory(event: FormEvent) { event.preventDefault(); setError(''); setMessage(''); try { const body = { courseId: category.courseId, name: category.name, icon: category.icon || null, description: category.description || null, isActive: category.isActive, sortOrder: category.sortOrder }; if (category.id) await api.patch(`/v1/admin/categories/${category.id}`, body); else await api.post('/v1/admin/categories', body); setMessage(category.id ? 'Category updated.' : 'Category added.'); setCategory({ id: '', courseId: category.courseId, name: '', icon: '', description: '', isActive: true, sortOrder: 0 }); await load(); } catch (err) { setError(err instanceof Error ? err.message : 'Save failed'); } }
+  async function saveSeries(event: FormEvent) { event.preventDefault(); setError(''); setMessage(''); try { const body = { courseId: series.courseId, title: series.title, subtitle: series.subtitle || null, description: series.description || null, coverUrl: series.coverUrl || null, isFeatured: series.isFeatured, isActive: series.isActive }; if (series.id) await api.patch(`/v1/admin/series/${series.id}`, body); else await api.post('/v1/admin/series', body); setMessage(series.id ? 'Series updated.' : 'Series added.'); setSeries({ id: '', courseId: series.courseId, title: '', subtitle: '', description: '', coverUrl: '', isFeatured: false, isActive: true }); await load(); } catch (err) { setError(err instanceof Error ? err.message : 'Save failed'); } }
+  async function remove(path: string, id: string, label: string) { if (!confirm(`Delete this ${label}?`)) return; try { await api.delete(`${path}/${id}`); setMessage(`${label} deleted.`); await load(); } catch (err) { setError(err instanceof Error ? err.message : 'Delete failed'); } }
+  return <section className="page widePage"><div className="pageHeader"><div><h1>Categories & Series</h1><p>Create, edit, and delete course categories and content series.</p></div></div>{message ? <div className="successBox">{message}</div> : null}{error ? <div className="errorBox">{error}</div> : null}<div className="statsGrid"><StatCard title="Categories" value={data.categories?.length ?? 0} caption="Lesson groupings" /><StatCard title="Series" value={data.series?.length ?? 0} caption="Featured pathways" /><StatCard title="Mode" value="CRUD" caption="Create/edit/delete" /><StatCard title="Course" value="German" caption="Mapped course" /></div>
+  <div className="twoCol"><form className="panel formStack" onSubmit={saveCategory}><h2>{category.id ? 'Edit category' : 'Add category'}</h2><label>Course<select value={category.courseId} onChange={(e) => setCategory({ ...category, courseId: e.target.value })}><option value="">Select course</option>{options.courses.map((course: any) => <option key={course.id} value={course.id}>{course.slug} · {labelFromJson(course.title_json, course.slug)}</option>)}</select></label><label>Name<input value={category.name} onChange={(e) => setCategory({ ...category, name: e.target.value })} /></label><label>Icon<input value={category.icon} onChange={(e) => setCategory({ ...category, icon: e.target.value })} /></label><label>Description<textarea value={category.description} onChange={(e) => setCategory({ ...category, description: e.target.value })} /></label><label>Sort order<input type="number" value={category.sortOrder} onChange={(e) => setCategory({ ...category, sortOrder: Number(e.target.value) })} /></label><label className="inlineCheck"><input type="checkbox" checked={category.isActive} onChange={(e) => setCategory({ ...category, isActive: e.target.checked })} /> Active</label><button className="primaryButton">{category.id ? 'Update category' : 'Add category'}</button></form>
+  <form className="panel formStack" onSubmit={saveSeries}><h2>{series.id ? 'Edit series' : 'Add series'}</h2><label>Course<select value={series.courseId} onChange={(e) => setSeries({ ...series, courseId: e.target.value })}><option value="">Select course</option>{options.courses.map((course: any) => <option key={course.id} value={course.id}>{course.slug} · {labelFromJson(course.title_json, course.slug)}</option>)}</select></label><label>Title<input value={series.title} onChange={(e) => setSeries({ ...series, title: e.target.value })} /></label><label>Subtitle<input value={series.subtitle} onChange={(e) => setSeries({ ...series, subtitle: e.target.value })} /></label><label>Cover URL<input value={series.coverUrl} onChange={(e) => setSeries({ ...series, coverUrl: e.target.value })} /></label><label>Description<textarea value={series.description} onChange={(e) => setSeries({ ...series, description: e.target.value })} /></label><label className="inlineCheck"><input type="checkbox" checked={series.isFeatured} onChange={(e) => setSeries({ ...series, isFeatured: e.target.checked })} /> Featured</label><label className="inlineCheck"><input type="checkbox" checked={series.isActive} onChange={(e) => setSeries({ ...series, isActive: e.target.checked })} /> Active</label><button className="primaryButton">{series.id ? 'Update series' : 'Add series'}</button></form></div>
+  <div className="twoCol"><div className="panel tablePanel"><h2>Categories</h2><table className="dataTable"><thead><tr><th>Name</th><th>Icon</th><th>Status</th><th>Actions</th></tr></thead><tbody>{(data.categories ?? []).map((item: any) => <tr key={item.id}><td><strong>{item.name}</strong><small>{item.description ?? ''}</small></td><td>{item.icon ?? '—'}</td><td><span className={item.is_active ? 'statusBadge good' : 'statusBadge warn'}>{item.is_active ? 'Active' : 'Off'}</span></td><td><div className="rowActions"><button onClick={() => editCategory(item)}>Edit</button><button className="dangerButton" onClick={() => remove('/v1/admin/categories', item.id, 'category')}>Delete</button></div></td></tr>)}</tbody></table></div><div className="panel tablePanel"><h2>Series</h2><table className="dataTable"><thead><tr><th>Title</th><th>Subtitle</th><th>Status</th><th>Actions</th></tr></thead><tbody>{(data.series ?? []).map((item: any) => <tr key={item.id}><td><strong>{item.title}</strong><small>{item.description ?? ''}</small></td><td>{item.subtitle ?? '—'}</td><td><span className={item.is_active ? 'statusBadge good' : 'statusBadge warn'}>{item.is_active ? 'Active' : 'Off'}</span>{item.is_featured ? <span className="statusBadge premium">Featured</span> : null}</td><td><div className="rowActions"><button onClick={() => editSeries(item)}>Edit</button><button className="dangerButton" onClick={() => remove('/v1/admin/series', item.id, 'series')}>Delete</button></div></td></tr>)}</tbody></table></div></div></section>;
 }
