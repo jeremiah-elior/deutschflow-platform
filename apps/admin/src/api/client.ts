@@ -2,7 +2,8 @@ import axios from 'axios';
 import { supabase } from './supabase';
 
 function normalizeApiBaseUrl(raw: string | undefined) {
-  const fallback = 'http://localhost:8080';
+  const browserOrigin = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '';
+  const fallback = browserOrigin || 'http://localhost:8080';
   let value = (raw || fallback).trim().replace(/\/+$/, '');
   // Admin calls already include /v1, so keep env as the API origin only.
   // If someone enters https://api.example.com/v1, make it safe instead of producing /v1/v1.
