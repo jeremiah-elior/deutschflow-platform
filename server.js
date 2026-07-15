@@ -1,11 +1,11 @@
 // Hostinger root entry file for DeutschFlow single-domain deployment.
-// V67 human CRUD dashboards + npm registry/package-lock fix + auto-build entry.
+// V68 production admin workflow + drawers/loading states + auto-build entry.
 const { existsSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { spawnSync } = require('node:child_process');
 
-const VERSION = 'V67_HUMAN_CRUD_DASHBOARDS_ACTIVE_2026_07_15';
+const VERSION = 'V68_PRODUCTION_ADMIN_WORKFLOW_ACTIVE_2026_07_15';
 const compiledServer = resolve(process.cwd(), 'apps/api/dist/server.js');
 const adminIndex = resolve(process.cwd(), 'dist/index.html');
 

@@ -1,8 +1,8 @@
 {
   "name": "deutschflow-platform",
   "private": true,
-  "version": "1.0.7",
-  "description": "DeutschFlow Hostinger single-domain build with npm registry fix, Node 20/22 safe Supabase setup, full human CRUD dashboards, and legacy content import.",
+  "version": "1.0.8",
+  "description": "DeutschFlow Hostinger single-domain build with production admin workflow drawers, visible loading/saving states, full CRUD dashboards, and legacy content import.",
   "workspaces": [
     "apps/*",
     "packages/*"
