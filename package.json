@@ -1,7 +1,7 @@
 {
   "name": "deutschflow-platform",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "DeutschFlow React admin + Node/Supabase backend for scalable multilingual content and LiD Test delivery.",
   "workspaces": [
     "apps/*",
@@ -20,7 +20,7 @@
     "start": "node server.js",
     "hostinger:build": "npm run build",
     "hostinger:start": "node server.js",
-    "postinstall": "NPM_CONFIG_PRODUCTION=false npm run build",
+    "postinstall": "node scripts/hostinger-postinstall.mjs",
     "prestart": "node scripts/ensure-build.mjs"
   },
   "devDependencies": {
