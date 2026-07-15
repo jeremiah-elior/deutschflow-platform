@@ -16,7 +16,9 @@
     "build:api": "npm run build -w @deutschflow/shared && npm run build -w @deutschflow/api",
     "import:legacy": "node scripts/import-legacy-mysql.mjs",
     "build:single-domain": "npm run build",
-    "start:single-domain": "npm run start -w @deutschflow/api"
+    "start:single-domain": "node server.js",
+    "start": "node server.js",
+    "hostinger:build": "npm run build"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
@@ -25,5 +27,6 @@
   "engines": {
     "node": ">=20.0.0",
     "npm": ">=10.0.0"
-  }
+  },
+  "main": "server.js"
 }
