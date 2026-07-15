@@ -1,11 +1,17 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
-import { BookOpen, Gauge, Globe2, GraduationCap, Library, LogOut, Settings, ShieldCheck } from 'lucide-react';
+import { BookOpen, FileText, Gauge, Globe2, GraduationCap, Layers3, Library, ListChecks, LogOut, MessageSquareText, Settings, ShieldCheck, Tags, Video } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const items = [
   { to: '/', label: 'Dashboard', icon: Gauge },
   { to: '/languages', label: 'Languages', icon: Globe2 },
   { to: '/courses', label: 'Courses', icon: GraduationCap },
+  { to: '/chapters', label: 'Chapters', icon: Layers3 },
+  { to: '/vocabulary', label: 'Vocabulary', icon: Tags },
+  { to: '/notes', label: 'Notes', icon: MessageSquareText },
+  { to: '/videos', label: 'Videos', icon: Video },
+  { to: '/quiz', label: 'Quiz', icon: ListChecks },
+  { to: '/taxonomy', label: 'Categories', icon: FileText },
   { to: '/lid', label: 'LiD Test', icon: ShieldCheck },
   { to: '/media', label: 'Media Library', icon: Library },
   { to: '/settings', label: 'App Config', icon: Settings }

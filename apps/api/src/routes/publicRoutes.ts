@@ -11,6 +11,27 @@ publicRoutes.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'deutschflow-api', time: new Date().toISOString(), configWarnings });
 });
 
+
+publicRoutes.get('/v1/languages', asyncHandler(async (_req, res) => {
+  const { data, error } = await supabaseAdmin.from('languages').select('*').order('sort_order');
+  if (error) throw new HttpError(500, 'languages_fetch_failed', error.message);
+  res.json({ languages: data ?? [] });
+}));
+
+publicRoutes.get('/v1/catalog', asyncHandler(async (req, res) => {
+  const lang = String(req.query.lang ?? 'te');
+  const { data: languages, error: languagesError } = await supabaseAdmin.from('languages').select('*').eq('is_active', true).order('sort_order');
+  if (languagesError) throw new HttpError(500, 'languages_fetch_failed', languagesError.message);
+  const { data: courses, error: coursesError } = await supabaseAdmin
+    .from('courses')
+    .select('slug,title_json,description_json,is_active,levels:course_levels(slug,title_json,description_json,is_active)')
+    .eq('is_active', true)
+    .order('sort_order');
+  if (coursesError) throw new HttpError(500, 'courses_fetch_failed', coursesError.message);
+  const lidManifest = await getPublishedLiDManifest(lang);
+  res.json({ schemaVersion: 1, requestedLanguage: lang, languages: languages ?? [], courses: courses ?? [], lidManifestAvailable: Boolean(lidManifest) });
+}));
+
 publicRoutes.get('/v1/app/bootstrap', asyncHandler(async (req, res) => {
   const lang = String(req.query.lang ?? 'te');
   const { data: languages } = await supabaseAdmin.from('languages').select('*').eq('is_active', true).order('sort_order');

@@ -68,3 +68,42 @@ pre { background:#0c1f16; color:#dbffe8; padding:16px; border-radius:16px; overf
 .hintBox { background:#eef7f1; border:1px solid #cfe5d7; color:#31503e; padding:12px 14px; border-radius:14px; margin-bottom:18px; }
 .inlineCheck { flex-direction: row !important; align-items:center; gap:10px !important; }
 .inlineCheck input { width:auto; }
+
+/* v65 professional dashboards */
+.widePage { max-width: 1480px; }
+.heroHeader { background: linear-gradient(135deg, #123d2a, #1d7a4e); color: #fff; border-radius: 30px; padding: 30px; box-shadow: 0 24px 70px rgba(18, 61, 42, .18); }
+.heroHeader p { color: #d9f5e6; }
+.eyebrow { margin: 0 0 6px !important; text-transform: uppercase; letter-spacing: .14em; font-weight: 800; font-size: 12px; color: #b8f2ce !important; }
+.healthPill { background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25); border-radius: 999px; padding: 12px 16px; align-self: center; }
+.megaStats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.contentTop { margin-top: 4px; }
+.sectionTitle { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom: 14px; }
+.sectionTitle h2 { margin: 0; }
+.sectionTitle span { color:#6c7a72; font-size: 13px; }
+.badgeStack { display:flex; flex-wrap:wrap; gap:10px; margin: 14px 0 18px; }
+.statusBadge { display:inline-flex; align-items:center; justify-content:center; border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 800; margin: 2px 4px 2px 0; white-space: nowrap; }
+.statusBadge.good { background:#e8f8ed; color:#147042; border:1px solid #bde8cb; }
+.statusBadge.warn { background:#fff5dc; color:#87600b; border:1px solid #f2d58c; }
+.statusBadge.premium { background:#f2ecff; color:#6642a3; border:1px solid #d6c4fb; }
+.quickGrid { display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; }
+.quickGrid a { border:1px solid #dbe9df; background:#f8fcf9; border-radius:16px; padding:14px; font-weight:800; color:#16633f; }
+.miniStats { display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom: 14px; }
+.miniStats div { background:#f7fbf8; border:1px solid #e3eee7; border-radius:16px; padding:14px; }
+.miniStats strong { display:block; font-size:26px; }
+.miniStats span, .muted { color:#69786f; }
+.stackList { display:flex; flex-direction:column; gap:10px; }
+.compactRow { display:flex; align-items:center; justify-content:space-between; gap:16px; border:1px solid #edf3ef; background:#fbfdfc; border-radius:16px; padding:13px 14px; }
+.compactRow strong, .dataTable strong { display:block; }
+.compactRow small, .dataTable small, .noteCard small { display:block; margin-top:4px; color:#728077; line-height:1.45; }
+.toolbarPanel { display:grid; grid-template-columns: 1fr minmax(160px, 220px) auto; gap:12px; align-items:end; }
+.tablePanel { overflow:auto; }
+.dataTable { min-width: 900px; }
+.dataTable th { text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:#6e7d74; padding: 12px 8px; border-bottom: 1px solid #dfe9e3; background:#f7fbf8; position: sticky; top: 0; }
+.dataTable td { vertical-align: top; }
+.pillLine { display:inline-flex; border-radius: 999px; background:#eff7f2; color:#31503e; padding:5px 8px; margin:2px; font-size:12px; font-weight:700; }
+.cardGrid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:18px; }
+.noteCard p { white-space: pre-wrap; line-height:1.65; color:#2d3d33; }
+.tableLink { color:#126b42; font-weight:800; text-decoration: underline; text-underline-offset: 3px; }
+.answerKey { display:inline-grid; place-items:center; width:34px; height:34px; border-radius:12px; background:#126b42; color:white; font-weight:900; }
+@media (max-width: 1180px) { .megaStats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .toolbarPanel { grid-template-columns: 1fr; } .miniStats { grid-template-columns: repeat(2,1fr); } .cardGrid { grid-template-columns: 1fr; } }
+@media (max-width: 960px) { .heroHeader { border-radius: 22px; padding: 22px; } .megaStats { grid-template-columns: 1fr; } }

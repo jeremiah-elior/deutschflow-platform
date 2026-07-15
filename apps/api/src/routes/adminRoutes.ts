@@ -26,6 +26,15 @@ import {
   publishLiDManifest,
   saveLiDAsset
 } from '../services/lidService.js';
+import {
+  getAdminOverview,
+  listAdminCategoriesAndSeries,
+  listAdminChapters,
+  listAdminNotes,
+  listAdminQuiz,
+  listAdminVideos,
+  listAdminVocabulary
+} from '../services/adminContentService.js';
 
 export const adminRoutes = Router();
 adminRoutes.use('/v1/admin', requireAdmin);
@@ -33,6 +42,35 @@ adminRoutes.use('/v1/admin', requireAdmin);
 adminRoutes.get('/v1/admin/me', (req, res) => {
   res.json({ user: req.user });
 });
+
+
+adminRoutes.get('/v1/admin/overview', asyncHandler(async (_req, res) => {
+  res.json(await getAdminOverview());
+}));
+
+adminRoutes.get('/v1/admin/chapters', asyncHandler(async (req, res) => {
+  res.json({ chapters: await listAdminChapters(req.query as any) });
+}));
+
+adminRoutes.get('/v1/admin/vocabulary', asyncHandler(async (req, res) => {
+  res.json({ vocabulary: await listAdminVocabulary(req.query as any) });
+}));
+
+adminRoutes.get('/v1/admin/notes', asyncHandler(async (req, res) => {
+  res.json({ notes: await listAdminNotes(req.query as any) });
+}));
+
+adminRoutes.get('/v1/admin/videos', asyncHandler(async (req, res) => {
+  res.json({ videos: await listAdminVideos(req.query as any) });
+}));
+
+adminRoutes.get('/v1/admin/quiz', asyncHandler(async (req, res) => {
+  res.json({ quiz: await listAdminQuiz(req.query as any) });
+}));
+
+adminRoutes.get('/v1/admin/content-taxonomy', asyncHandler(async (_req, res) => {
+  res.json(await listAdminCategoriesAndSeries());
+}));
 
 adminRoutes.get('/v1/admin/languages', asyncHandler(async (_req, res) => {
   res.json({ languages: await listLanguages() });

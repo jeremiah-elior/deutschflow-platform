@@ -1,11 +1,11 @@
 // Hostinger root entry file for DeutschFlow single-domain deployment.
-// V64 diagnostic + auto-build entry. Includes Supabase WebSocket transport fix for Node 20.
+// V65 dashboards + auto-build entry. Includes Supabase WebSocket transport fix for Node 20.
 const { existsSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { spawnSync } = require('node:child_process');
 
-const VERSION = 'V64_WS_NODE20_FIX_ACTIVE_2026_07_15';
+const VERSION = 'V65_FULL_DASHBOARDS_ACTIVE_2026_07_15';
 const compiledServer = resolve(process.cwd(), 'apps/api/dist/server.js');
 const adminIndex = resolve(process.cwd(), 'dist/index.html');
 
