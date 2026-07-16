@@ -156,6 +156,39 @@ function hasMobileVisibleContent(chapter: ChapterRow, lang: string) {
   return Boolean(title && !hasGenericSetupTitle && (chapter.duration_seconds ?? 0) > 0);
 }
 
+
+function videoMatches(video: AnyRow, lang: string, fallback: boolean) {
+  // v70 migration adds language_code. Existing old video rows are marked te.
+  // Null language_code is treated as shared/non-localized content.
+  if (video.is_enabled === false) return false;
+  if (!video.language_code) return true;
+  if (video.language_code === lang) return true;
+  return fallback;
+}
+
+function getPrimaryVideo(chapter: ChapterRow, lang: string, fallback = false) {
+  return (chapter.chapter_videos ?? [])
+    .filter((video) => videoMatches(video, lang, fallback))
+    .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))[0] ?? null;
+}
+
+function videoSummary(video: AnyRow | null | undefined) {
+  if (!video) {
+    return {
+      videoUrl: null,
+      videoThumbnailUrl: null,
+      videoDurationSeconds: 0,
+      hasVideo: false
+    };
+  }
+  return {
+    videoUrl: normalizeMediaUrl(video.video_url) ?? null,
+    videoThumbnailUrl: normalizeMediaUrl(video.thumbnail_url) ?? null,
+    videoDurationSeconds: Number(video.duration_seconds ?? 0),
+    hasVideo: Boolean(normalizeMediaUrl(video.video_url))
+  };
+}
+
 function buildLessonSummary(chapter: ChapterRow, level: LevelRow | undefined, lang: string, fallback = false) {
   const translation = getTranslation(chapter, lang);
   const fallbackTranslation = fallback ? getAnyTranslation(chapter) : null;
@@ -163,6 +196,8 @@ function buildLessonSummary(chapter: ChapterRow, level: LevelRow | undefined, la
   const titleEn = localized(chapter.title_json, 'en') || chapter.slug;
   const title = nativeTitle || titleEn;
   const coverUrl = getCoverUrl(chapter);
+  const primaryVideo = getPrimaryVideo(chapter, lang, fallback);
+  const primaryVideoSummary = videoSummary(primaryVideo);
 
   return {
     id: clientLessonId(chapter),
@@ -181,6 +216,10 @@ function buildLessonSummary(chapter: ChapterRow, level: LevelRow | undefined, la
     audioUrl: getAudioUrl(chapter, lang, fallback),
     coverUrl,
     manualCoverUrl: coverUrl,
+    videoUrl: primaryVideoSummary.videoUrl,
+    videoThumbnailUrl: primaryVideoSummary.videoThumbnailUrl || coverUrl,
+    videoDurationSeconds: primaryVideoSummary.videoDurationSeconds,
+    hasVideo: primaryVideoSummary.hasVideo,
     isPremium: Boolean(chapter.is_premium),
     isFeatured: Boolean(chapter.is_featured),
     updatedAt: chapter.updated_at ?? null
@@ -278,16 +317,6 @@ export async function getMobileLessonOverview(id: string, langInput: unknown, fa
   const isFallback = fallback && !getTranslation(chapter, lang) && Boolean(getAnyTranslation(chapter));
   return { success: true, language: lang, lessonId: clientLessonId(chapter), ...(isFallback ? { fallbackLanguage: getAnyTranslation(chapter)?.language_code, isFallback: true } : {}), overview };
 }
-
-function videoMatches(video: AnyRow, lang: string, fallback: boolean) {
-  // v70 migration adds language_code. Existing old video rows are marked te.
-  // Null language_code is treated as shared/non-localized content.
-  if (video.is_enabled === false) return false;
-  if (!video.language_code) return true;
-  if (video.language_code === lang) return true;
-  return fallback;
-}
-
 export async function getMobileLessonVideos(id: string, langInput: unknown, fallbackInput?: unknown) {
   const lang = normalizeLanguage(langInput);
   const fallback = String(fallbackInput ?? '') === '1';

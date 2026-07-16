@@ -5,7 +5,7 @@ const { resolve } = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { spawnSync } = require('node:child_process');
 
-const VERSION = 'V72_MEDIA_UPLOADS_REDIRECT_ACTIVE_2026_07_16';
+const VERSION = 'V73_VIDEO_FIELDS_PLAYER_API_ACTIVE_2026_07_16';
 const compiledServer = resolve(process.cwd(), 'apps/api/dist/server.js');
 const adminIndex = resolve(process.cwd(), 'dist/index.html');
 

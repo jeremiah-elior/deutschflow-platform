@@ -12,7 +12,7 @@ import { adminRoutes } from './routes/adminRoutes.js';
 
 const app = express();
 
-const VERSION = 'V72_MEDIA_UPLOADS_REDIRECT_ACTIVE_2026_07_16';
+const VERSION = 'V73_VIDEO_FIELDS_PLAYER_API_ACTIVE_2026_07_16';
 console.log(`DeutschFlow API ${VERSION}`);
 
 app.use(helmet({
