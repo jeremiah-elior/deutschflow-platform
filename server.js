@@ -5,7 +5,7 @@ const { resolve } = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { spawnSync } = require('node:child_process');
 
-const VERSION = 'V70_PHP_COMPAT_MOBILE_APIS_ACTIVE_2026_07_16';
+const VERSION = 'V71_MOBILE_API_CLEAN_LIST_ACTIVE_2026_07_16';
 const compiledServer = resolve(process.cwd(), 'apps/api/dist/server.js');
 const adminIndex = resolve(process.cwd(), 'dist/index.html');
 

@@ -121,6 +121,20 @@ function getCoverUrl(chapter: ChapterRow) {
   return publicAssetUrl(coverAsset) || chapter.series?.cover_url || null;
 }
 
+function hasMobileVisibleContent(chapter: ChapterRow, lang: string) {
+  // Imported legacy lessons are valid mobile lessons.
+  // New Supabase placeholder chapters from setup/admin should not appear in the mobile list
+  // until they have real language content or media. This prevents empty rows like "Chapter 01"
+  // with no audio/title/category from reaching the app.
+  if (chapter.legacy_id !== null && chapter.legacy_id !== undefined) return true;
+  if (getTranslation(chapter, lang)) return true;
+  if (getAudioUrl(chapter, lang, false)) return true;
+  if (findAsset(chapter, 'cover')) return true;
+  const title = localized(chapter.title_json, lang) || localized(chapter.title_json, 'en');
+  const hasGenericSetupTitle = /^chapter\s*\d+$/i.test(title.trim()) || /^chapter-\d+$/i.test(String(chapter.slug ?? ''));
+  return Boolean(title && !hasGenericSetupTitle && (chapter.duration_seconds ?? 0) > 0);
+}
+
 function buildLessonSummary(chapter: ChapterRow, level: LevelRow | undefined, lang: string, fallback = false) {
   const translation = getTranslation(chapter, lang);
   const fallbackTranslation = fallback ? getAnyTranslation(chapter) : null;
@@ -226,7 +240,9 @@ export async function getMobileLessons(params: { lang?: unknown; level?: unknown
   const levels = await getLevelsForCourse(course.id, requestedLevel);
   const levelMap = new Map(levels.map((level) => [level.id, level]));
   const chapters = await getChaptersForLevels(levels.map((level) => level.id));
-  const lessons = chapters.map((chapter) => buildLessonSummary(chapter, levelMap.get(String(chapter.level_id)), lang, false));
+  const lessons = chapters
+    .filter((chapter) => hasMobileVisibleContent(chapter, lang))
+    .map((chapter) => buildLessonSummary(chapter, levelMap.get(String(chapter.level_id)), lang, false));
   if (String(params.legacy ?? '') === '1') return lessons;
   return { success: true, language: lang, lessons };
 }
