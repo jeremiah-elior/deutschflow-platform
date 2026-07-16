@@ -47,6 +47,27 @@ type ChapterRow = {
 
 const SUPPORTED_APP_LANGS = new Set(['te', 'ta', 'kn']);
 const DEFAULT_COURSE_SLUG = 'german';
+const LEGACY_MEDIA_BASE_URL = 'https://silver-llama-257051.hostingersite.com';
+
+function publicAppBaseUrl() {
+  const explicit = process.env.PUBLIC_APP_BASE_URL || '';
+  const corsFirst = String(process.env.CORS_ORIGIN || '').split(',')[0]?.trim() || '';
+  return (explicit || corsFirst || '').replace(/\/$/, '');
+}
+
+function normalizeMediaUrl(value: unknown) {
+  if (typeof value !== 'string') return null;
+  const url = value.trim();
+  if (!url) return null;
+  const appBase = publicAppBaseUrl();
+  if (url.startsWith('/uploads/')) return appBase ? `${appBase}${url}` : url;
+  const legacyBase = LEGACY_MEDIA_BASE_URL.replace(/\/$/, '');
+  if (url.startsWith(`${legacyBase}/uploads/`)) {
+    const path = url.slice(legacyBase.length);
+    return appBase ? `${appBase}${path}` : url;
+  }
+  return url;
+}
 
 function normalizeLanguage(input: unknown) {
   const lang = String(input ?? 'te').trim().toLowerCase();
@@ -93,7 +114,7 @@ function durationMinutes(rawSecondsOrMinutes: number | null | undefined) {
 
 function publicAssetUrl(asset: AnyRow | null | undefined) {
   if (!asset) return null;
-  return asset.public_url || asset.storage_path || null;
+  return normalizeMediaUrl(asset.public_url || asset.storage_path || null);
 }
 
 function findAsset(chapter: ChapterRow, assetType: string, lang?: string) {
@@ -109,16 +130,16 @@ function getAudioUrl(chapter: ChapterRow, lang: string, fallback = false) {
   const languageAsset = findAsset(chapter, 'audio', lang);
   const languageTranslation = getTranslation(chapter, lang);
   const direct = publicAssetUrl(languageAsset) || languageTranslation?.audio_url || null;
-  if (direct) return direct;
+  if (direct) return normalizeMediaUrl(direct);
   if (!fallback) return null;
   const anyAudioAsset = findAsset(chapter, 'audio');
   const anyTranslation = getAnyTranslation(chapter);
-  return publicAssetUrl(anyAudioAsset) || anyTranslation?.audio_url || null;
+  return normalizeMediaUrl(publicAssetUrl(anyAudioAsset) || anyTranslation?.audio_url || null);
 }
 
 function getCoverUrl(chapter: ChapterRow) {
   const coverAsset = findAsset(chapter, 'cover');
-  return publicAssetUrl(coverAsset) || chapter.series?.cover_url || null;
+  return normalizeMediaUrl(publicAssetUrl(coverAsset) || chapter.series?.cover_url || null);
 }
 
 function hasMobileVisibleContent(chapter: ChapterRow, lang: string) {
@@ -278,8 +299,8 @@ export async function getMobileLessonVideos(id: string, langInput: unknown, fall
       id: video.legacy_id ?? video.id,
       uuid: video.id,
       title: video.title ?? 'Video Overview',
-      videoUrl: video.video_url,
-      thumbnailUrl: video.thumbnail_url ?? null,
+      videoUrl: normalizeMediaUrl(video.video_url),
+      thumbnailUrl: normalizeMediaUrl(video.thumbnail_url) ?? null,
       durationSeconds: video.duration_seconds ?? 0,
       isEnabled: video.is_enabled !== false,
       isPremium: Boolean(video.is_premium),
@@ -490,5 +511,5 @@ export async function getMobileSeries() {
     .eq('is_active', true)
     .order('title');
   if (error) throw new HttpError(500, 'series_fetch_failed', error.message);
-  return { success: true, series: (data ?? []).map((item: AnyRow) => ({ id: item.legacy_id ?? item.id, uuid: item.id, title: item.title, subtitle: item.subtitle, description: item.description, coverUrl: item.cover_url, isFeatured: Boolean(item.is_featured) })) };
+  return { success: true, series: (data ?? []).map((item: AnyRow) => ({ id: item.legacy_id ?? item.id, uuid: item.id, title: item.title, subtitle: item.subtitle, description: item.description, coverUrl: normalizeMediaUrl(item.cover_url), isFeatured: Boolean(item.is_featured) })) };
 }

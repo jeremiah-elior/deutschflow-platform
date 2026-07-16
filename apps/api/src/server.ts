@@ -12,6 +12,9 @@ import { adminRoutes } from './routes/adminRoutes.js';
 
 const app = express();
 
+const VERSION = 'V72_MEDIA_UPLOADS_REDIRECT_ACTIVE_2026_07_16';
+console.log(`DeutschFlow API ${VERSION}`);
+
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: false
@@ -22,6 +25,33 @@ app.use(morgan('dev'));
 
 app.use(publicRoutes);
 app.use(adminRoutes);
+
+// Legacy uploaded media compatibility.
+// Old imported rows can still point to /uploads/... paths. In single-domain mode,
+// those URLs must not fall through to the React admin SPA. Serve local uploads if
+// present; otherwise redirect to the legacy media host until files are migrated
+// into Supabase Storage.
+const uploadsDir = resolve(process.cwd(), 'uploads');
+if (existsSync(uploadsDir)) {
+  console.log(`Serving local uploaded media from ${uploadsDir}`);
+  app.use('/uploads', express.static(uploadsDir, {
+    index: false,
+    maxAge: env.NODE_ENV === 'production' ? '30d' : 0,
+    setHeaders: (res) => {
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('Accept-Ranges', 'bytes');
+    }
+  }));
+}
+
+app.use('/uploads', (req, res) => {
+  const legacyBase = (process.env.LEGACY_MEDIA_BASE_URL || 'https://silver-llama-257051.hostingersite.com').replace(/\/$/, '');
+  const safeOriginalUrl = req.originalUrl.replace(/\\/g, '/');
+  if (safeOriginalUrl.includes('..')) {
+    return res.status(400).json({ success: false, error: 'invalid_media_path' });
+  }
+  return res.redirect(302, `${legacyBase}${safeOriginalUrl}`);
+});
 
 function findAdminDistPath() {
   const here = dirname(fileURLToPath(import.meta.url));
