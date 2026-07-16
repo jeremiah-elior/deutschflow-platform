@@ -1,11 +1,11 @@
 // Hostinger root entry file for DeutschFlow single-domain deployment.
-// V69 production side-inspector admin workflow + auto-build entry.
+// V70 PHP-compatible mobile APIs + side-inspector admin workflow + auto-build entry.
 const { existsSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { spawnSync } = require('node:child_process');
 
-const VERSION = 'V69_SIDE_INSPECTOR_WORKFLOW_ACTIVE_2026_07_15';
+const VERSION = 'V70_PHP_COMPAT_MOBILE_APIS_ACTIVE_2026_07_16';
 const compiledServer = resolve(process.cwd(), 'apps/api/dist/server.js');
 const adminIndex = resolve(process.cwd(), 'dist/index.html');
 

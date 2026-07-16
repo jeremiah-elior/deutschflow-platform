@@ -12,6 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
+import WebSocket from 'ws';
 
 const dumpPath = process.argv[2];
 if (!dumpPath) {
@@ -26,7 +27,10 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
   process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
+  auth: { autoRefreshToken: false, persistSession: false },
+  realtime: { transport: WebSocket }
+});
 const sql = fs.readFileSync(path.resolve(dumpPath), 'utf8');
 
 function parseValue(raw) {

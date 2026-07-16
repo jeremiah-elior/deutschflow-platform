@@ -1,8 +1,8 @@
 {
   "name": "deutschflow-platform",
   "private": true,
-  "version": "1.0.9",
-  "description": "DeutschFlow Hostinger single-domain build with production side-inspector admin workflow, table-first CRUD, visible loading states, and legacy content dashboards.",
+  "version": "1.0.10",
+  "description": "DeutschFlow Hostinger single-domain backend with PHP-compatible mobile APIs, production admin, and section-based lesson detail endpoints.",
   "workspaces": [
     "apps/*",
     "packages/*"
