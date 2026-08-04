@@ -1,8 +1,8 @@
 {
   "name": "deutschflow-platform",
   "private": true,
-  "version": "1.0.11",
-  "description": "DeutschFlow V75 single-domain backend with public website, legal pages, protected admin, and stale-build-safe Hostinger deployment.",
+  "version": "1.0.12",
+  "description": "DeutschFlow V76 single-domain backend with public website, legal pages, protected admin, and flat-root Hostinger deployment verification.",
   "workspaces": [
     "apps/*",
     "packages/*"

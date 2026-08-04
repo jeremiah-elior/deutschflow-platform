@@ -5,11 +5,11 @@ const { resolve } = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { spawnSync } = require('node:child_process');
 
-const VERSION = 'V75_PUBLIC_SITE_BUILD_FIX_2026_08_04';
+const VERSION = 'V76_DEPLOY_ROOT_FIX_2026_08_05';
 const compiledServer = resolve(process.cwd(), 'apps/api/dist/server.js');
 const adminIndex = resolve(process.cwd(), 'dist/index.html');
 const buildStamp = resolve(process.cwd(), 'dist/.deutschflow-build-version');
-const EXPECTED_ADMIN_BUILD = 'V75_PUBLIC_SITE_BUILD_2026_08_04';
+const EXPECTED_ADMIN_BUILD = 'V76_PUBLIC_SITE_BUILD_2026_08_05';
 
 console.log(`DeutschFlow ${VERSION}`);
 console.log('DeutschFlow cwd:', process.cwd());

@@ -12,7 +12,7 @@ import { adminRoutes } from './routes/adminRoutes.js';
 
 const app = express();
 
-const VERSION = 'V75_PUBLIC_SITE_BUILD_FIX_2026_08_04';
+const VERSION = 'V76_DEPLOY_ROOT_FIX_2026_08_05';
 console.log(`DeutschFlow API ${VERSION}`);
 
 app.use(helmet({
@@ -25,6 +25,13 @@ app.use(morgan('dev'));
 
 app.use(publicRoutes);
 app.use(adminRoutes);
+
+// Server-side compatibility redirects. These run before the SPA fallback so
+// old bookmarks never render the legacy login route.
+app.get('/login', (_req, res) => res.redirect(302, '/admin/login'));
+for (const path of ['languages', 'courses', 'chapters', 'vocabulary', 'notes', 'videos', 'quiz', 'taxonomy', 'lid', 'media', 'settings']) {
+  app.get(`/${path}`, (_req, res) => res.redirect(302, `/admin/${path}`));
+}
 
 // Legacy uploaded media compatibility.
 // Old imported rows can still point to /uploads/... paths. In single-domain mode,

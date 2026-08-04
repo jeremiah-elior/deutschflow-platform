@@ -9,7 +9,12 @@ import { getMobileCategories, getMobileLessonDetail, getMobileLessons, getMobile
 export const publicRoutes = Router();
 
 publicRoutes.get('/health', (_req, res) => {
-  res.json({ ok: true, service: 'deutschflow-api', time: new Date().toISOString(), configWarnings });
+  res.json({ ok: true, service: 'deutschflow-api', version: 'V76_DEPLOY_ROOT_FIX_2026_08_05', time: new Date().toISOString(), configWarnings });
+});
+
+publicRoutes.get('/__version', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ app: 'DeutschFlow', version: 'V76_DEPLOY_ROOT_FIX_2026_08_05' });
 });
 
 
