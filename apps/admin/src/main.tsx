@@ -1,9 +1,6 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import { ProtectedRoute } from './components/ProtectedRoute';
-import { Layout } from './components/Layout';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { PublicLayout } from './public/PublicLayout';
 import { HomePage } from './pages/public/HomePage';
 import { AboutPage } from './pages/public/AboutPage';
@@ -13,24 +10,20 @@ import { TermsPage } from './pages/public/TermsPage';
 import { DeleteAccountPage } from './pages/public/DeleteAccountPage';
 import { ImpressumPage } from './pages/public/ImpressumPage';
 import { NotFoundPage } from './pages/public/NotFoundPage';
-import { LoginPage } from './pages/LoginPage';
-import { DashboardPage } from './pages/DashboardPage';
-import { LanguagesPage } from './pages/LanguagesPage';
-import { CoursesPage } from './pages/CoursesPage';
-import { ChaptersPage } from './pages/ChaptersPage';
-import { VocabularyPage } from './pages/VocabularyPage';
-import { NotesPage } from './pages/NotesPage';
-import { VideosPage } from './pages/VideosPage';
-import { QuizPage } from './pages/QuizPage';
-import { TaxonomyPage } from './pages/TaxonomyPage';
-import { LiDPage } from './pages/LiDPage';
-import { MediaPage } from './pages/MediaPage';
-import { SettingsPage } from './pages/SettingsPage';
 import './styles/global.css';
 import './styles/public.css';
 
-function AdminAuthBoundary() {
-  return <AuthProvider><Outlet /></AuthProvider>;
+// Keep Supabase/admin code out of the public bundle's initial execution path.
+// This lets public/legal pages render even when an admin-specific VITE_* value
+// is temporarily missing or misconfigured during deployment.
+const AdminApp = lazy(() => import('./AdminApp'));
+
+function AdminLoader() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '70vh', display: 'grid', placeItems: 'center', fontFamily: 'Inter, system-ui, sans-serif' }}>Loading DeutschFlow Admin…</div>}>
+      <AdminApp />
+    </Suspense>
+  );
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -53,24 +46,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         {['languages', 'courses', 'chapters', 'vocabulary', 'notes', 'videos', 'quiz', 'taxonomy', 'lid', 'media', 'settings'].map((path) => (
           <Route key={path} path={`/${path}`} element={<Navigate to={`/admin/${path}`} replace />} />
         ))}
-        <Route path="/admin" element={<AdminAuthBoundary />}>
-          <Route path="login" element={<LoginPage />} />
-          <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-            <Route index element={<DashboardPage />} />
-            <Route path="languages" element={<LanguagesPage />} />
-            <Route path="courses" element={<CoursesPage />} />
-            <Route path="chapters" element={<ChaptersPage />} />
-            <Route path="vocabulary" element={<VocabularyPage />} />
-            <Route path="notes" element={<NotesPage />} />
-            <Route path="videos" element={<VideosPage />} />
-            <Route path="quiz" element={<QuizPage />} />
-            <Route path="taxonomy" element={<TaxonomyPage />} />
-            <Route path="lid" element={<LiDPage />} />
-            <Route path="media" element={<MediaPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-          </Route>
-        </Route>
 
+        <Route path="/admin/*" element={<AdminLoader />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>

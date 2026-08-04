@@ -12,7 +12,7 @@ import { adminRoutes } from './routes/adminRoutes.js';
 
 const app = express();
 
-const VERSION = 'V74_PUBLIC_SITE_LEGAL_PAGES_2026_08_04';
+const VERSION = 'V75_PUBLIC_SITE_BUILD_FIX_2026_08_04';
 console.log(`DeutschFlow API ${VERSION}`);
 
 app.use(helmet({

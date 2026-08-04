@@ -1,4 +1,4 @@
-import { cpSync, existsSync, rmSync, mkdirSync } from 'node:fs';
+import { cpSync, existsSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const source = resolve('apps/admin/dist');
@@ -15,4 +15,5 @@ if (existsSync(target)) {
 
 mkdirSync(target, { recursive: true });
 cpSync(source, target, { recursive: true });
-console.log(`Copied admin build output to ${target}`);
+writeFileSync(resolve(target, '.deutschflow-build-version'), 'V75_PUBLIC_SITE_BUILD_2026_08_04\n');
+console.log(`Copied admin build output to ${target} with V75 build stamp`);
