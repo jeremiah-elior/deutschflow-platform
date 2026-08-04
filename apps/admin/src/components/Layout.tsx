@@ -3,18 +3,18 @@ import { BookOpen, FileText, Gauge, Globe2, GraduationCap, Layers3, Library, Lis
 import { useAuth } from '../contexts/AuthContext';
 
 const items = [
-  { to: '/', label: 'Dashboard', icon: Gauge },
-  { to: '/languages', label: 'Languages', icon: Globe2 },
-  { to: '/courses', label: 'Courses', icon: GraduationCap },
-  { to: '/chapters', label: 'Chapters', icon: Layers3 },
-  { to: '/vocabulary', label: 'Vocabulary', icon: Tags },
-  { to: '/notes', label: 'Notes', icon: MessageSquareText },
-  { to: '/videos', label: 'Videos', icon: Video },
-  { to: '/quiz', label: 'Quiz', icon: ListChecks },
-  { to: '/taxonomy', label: 'Categories', icon: FileText },
-  { to: '/lid', label: 'LiD Test', icon: ShieldCheck },
-  { to: '/media', label: 'Media Library', icon: Library },
-  { to: '/settings', label: 'App Config', icon: Settings }
+  { to: '/admin', label: 'Dashboard', icon: Gauge },
+  { to: '/admin/languages', label: 'Languages', icon: Globe2 },
+  { to: '/admin/courses', label: 'Courses', icon: GraduationCap },
+  { to: '/admin/chapters', label: 'Chapters', icon: Layers3 },
+  { to: '/admin/vocabulary', label: 'Vocabulary', icon: Tags },
+  { to: '/admin/notes', label: 'Notes', icon: MessageSquareText },
+  { to: '/admin/videos', label: 'Videos', icon: Video },
+  { to: '/admin/quiz', label: 'Quiz', icon: ListChecks },
+  { to: '/admin/taxonomy', label: 'Categories', icon: FileText },
+  { to: '/admin/lid', label: 'LiD Test', icon: ShieldCheck },
+  { to: '/admin/media', label: 'Media Library', icon: Library },
+  { to: '/admin/settings', label: 'App Config', icon: Settings }
 ];
 
 export function Layout() {
@@ -22,7 +22,7 @@ export function Layout() {
   return (
     <div className="shell">
       <aside className="sidebar">
-        <Link to="/" className="brand">
+        <Link to="/admin" className="brand">
           <span className="brandIcon"><BookOpen size={22} /></span>
           <span>
             <strong>DeutschFlow</strong>
@@ -33,7 +33,7 @@ export function Layout() {
           {items.map((item) => {
             const Icon = item.icon;
             return (
-              <NavLink key={item.to} to={item.to} end={item.to === '/'}>
+              <NavLink key={item.to} to={item.to} end={item.to === '/admin'}>
                 <Icon size={18} />
                 <span>{item.label}</span>
               </NavLink>
@@ -41,6 +41,7 @@ export function Layout() {
           })}
         </nav>
         <div className="sidebarFooter">
+          <Link to="/" className="adminSiteLink">View public website</Link>
           <small>{session?.user.email}</small>
           <button className="ghostButton" onClick={() => signOut()}><LogOut size={16} /> Sign out</button>
         </div>

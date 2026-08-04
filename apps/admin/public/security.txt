@@ -1,0 +1,3 @@
+# Replace the contact address if your production support email is different.
+Contact: mailto:support@deutschflow.app
+Preferred-Languages: en, de

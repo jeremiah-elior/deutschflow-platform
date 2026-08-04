@@ -66,10 +66,10 @@ export function DashboardPage() {
             <ReadyBadge ready={Boolean(health.publishedContentReady)} label="Published manifests" />
           </div>
           <div className="quickGrid">
-            <Link to="/chapters">Review chapters</Link>
-            <Link to="/vocabulary">Review vocabulary</Link>
-            <Link to="/videos">Review videos</Link>
-            <Link to="/quiz">Review quiz</Link>
+            <Link to="/admin/chapters">Review chapters</Link>
+            <Link to="/admin/vocabulary">Review vocabulary</Link>
+            <Link to="/admin/videos">Review videos</Link>
+            <Link to="/admin/quiz">Review quiz</Link>
           </div>
         </div>
 
