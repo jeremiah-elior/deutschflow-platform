@@ -42,7 +42,7 @@ export function Layout() {
         </nav>
         <div className="sidebarFooter">
           <Link to="/" className="adminSiteLink">View public website</Link>
-          <small>{session?.user.email}</small>
+          <small>{session?.email}</small>
           <button className="ghostButton" onClick={() => signOut()}><LogOut size={16} /> Sign out</button>
         </div>
       </aside>
