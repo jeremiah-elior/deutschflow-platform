@@ -12,7 +12,7 @@ import { adminRoutes } from './routes/adminRoutes.js';
 
 const app = express();
 
-const VERSION = 'V80_MYSQL_MEDIA_LOCAL_ONLY_2026_08_05';
+const VERSION = 'V81_MYSQL_MEDIA_SYNTAX_FIX_2026_08_05';
 console.log(`DeutschFlow API ${VERSION}`);
 
 app.use(helmet({
@@ -67,7 +67,7 @@ if (existsSync(uploadsRootDir)) {
 }
 
 app.use('/uploads', (req, res) => {
-  const safeOriginalUrl = req.originalUrl.replace(/\/g, '/');
+  const safeOriginalUrl = req.originalUrl.replace(/\\/g, '/');
   if (safeOriginalUrl.includes('..')) {
     return res.status(400).json({ success: false, error: 'invalid_media_path' });
   }

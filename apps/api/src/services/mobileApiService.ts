@@ -61,7 +61,7 @@ function normalizeMediaUrl(value: unknown) {
   let raw = value.trim();
   if (!raw) return null;
   const appBase = publicAppBaseUrl();
-  raw = raw.replace(/\/g, '/');
+  raw = raw.replace(/\\/g, '/');
 
   try {
     const parsed = new URL(raw);
