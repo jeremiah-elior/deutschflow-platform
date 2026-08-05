@@ -12,7 +12,7 @@ import { adminRoutes } from './routes/adminRoutes.js';
 
 const app = express();
 
-const VERSION = 'V77_MYSQL_2026_08_05';
+const VERSION = 'V80_MYSQL_MEDIA_LOCAL_ONLY_2026_08_05';
 console.log(`DeutschFlow API ${VERSION}`);
 
 app.use(helmet({
@@ -48,28 +48,30 @@ if (existsSync(contentUploadsDir)) {
   }));
 }
 
-// Legacy /uploads/* compatibility. Keep this after the V77 content mount so old
-// cover/audio URLs can still resolve from a local legacy uploads folder or fall
-// back to the previous media host while they are gradually copied over.
-const legacyUploadsDir = resolve(process.cwd(), 'uploads');
-if (existsSync(legacyUploadsDir)) {
-  app.use('/uploads', express.static(legacyUploadsDir, {
+// Serve all DeutschFlow uploads from the same persistent uploads root.
+// If UPLOADS_DIR is /.../public_html/uploads/content, its parent is
+// /.../public_html/uploads, so covers/videos can live beside content.
+// There is deliberately NO redirect to the retired silver-llama host.
+const uploadsRootDir = resolve(contentUploadsDir, '..');
+if (existsSync(uploadsRootDir)) {
+  console.log(`Serving DeutschFlow uploads root from ${uploadsRootDir}`);
+  app.use('/uploads', express.static(uploadsRootDir, {
     index: false,
     maxAge: env.NODE_ENV === 'production' ? '30d' : 0,
     setHeaders: (res) => {
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
       res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
     }
   }));
 }
 
 app.use('/uploads', (req, res) => {
-  const legacyBase = (process.env.LEGACY_MEDIA_BASE_URL || 'https://silver-llama-257051.hostingersite.com').replace(/\/$/, '');
-  const safeOriginalUrl = req.originalUrl.replace(/\\/g, '/');
+  const safeOriginalUrl = req.originalUrl.replace(/\/g, '/');
   if (safeOriginalUrl.includes('..')) {
     return res.status(400).json({ success: false, error: 'invalid_media_path' });
   }
-  return res.redirect(302, `${legacyBase}${safeOriginalUrl}`);
+  return res.status(404).json({ success: false, error: 'media_file_not_found', path: safeOriginalUrl });
 });
 
 function findAdminDistPath() {

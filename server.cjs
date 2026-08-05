@@ -4,7 +4,7 @@ const { existsSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { pathToFileURL } = require('node:url');
 
-const VERSION = 'V79_MYSQL_TYPESCRIPT_FIX_2026_08_05';
+const VERSION = 'V80_MYSQL_MEDIA_LOCAL_ONLY_2026_08_05';
 const compiledServer = resolve(process.cwd(), 'apps/api/dist/server.js');
 const adminIndex = resolve(process.cwd(), 'dist/index.html');
 

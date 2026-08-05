@@ -48,7 +48,7 @@ type ChapterRow = {
 
 const SUPPORTED_APP_LANGS = new Set(['te', 'ta', 'kn']);
 const DEFAULT_COURSE_SLUG = 'german';
-const LEGACY_MEDIA_BASE_URL = 'https://silver-llama-257051.hostingersite.com';
+const RETIRED_MEDIA_HOSTS = new Set(['silver-llama-257051.hostingersite.com', 'deutsch.berlinpulse.eu']);
 
 function publicAppBaseUrl() {
   const explicit = process.env.PUBLIC_APP_BASE_URL || '';
@@ -58,16 +58,47 @@ function publicAppBaseUrl() {
 
 function normalizeMediaUrl(value: unknown) {
   if (typeof value !== 'string') return null;
-  const url = value.trim();
-  if (!url) return null;
+  let raw = value.trim();
+  if (!raw) return null;
   const appBase = publicAppBaseUrl();
-  if (url.startsWith('/uploads/')) return appBase ? `${appBase}${url}` : url;
-  const legacyBase = LEGACY_MEDIA_BASE_URL.replace(/\/$/, '');
-  if (url.startsWith(`${legacyBase}/uploads/`)) {
-    const path = url.slice(legacyBase.length);
-    return appBase ? `${appBase}${path}` : url;
+  raw = raw.replace(/\/g, '/');
+
+  try {
+    const parsed = new URL(raw);
+    const host = parsed.hostname.toLowerCase();
+    if (RETIRED_MEDIA_HOSTS.has(host)) {
+      const path = `${parsed.pathname}${parsed.search}`;
+      return appBase ? `${appBase}${path}` : path;
+    }
+    if (host.endsWith('.supabase.co') && parsed.pathname.includes('/storage/v1/object/public/content/')) {
+      const suffix = parsed.pathname.split('/storage/v1/object/public/content/')[1] || '';
+      const path = `/uploads/content/${suffix}${parsed.search}`;
+      return appBase ? `${appBase}${path}` : path;
+    }
+    if (host === 'mydeutschflow.de') {
+      const path = `${parsed.pathname}${parsed.search}`;
+      return appBase ? `${appBase}${path}` : raw;
+    }
+    return raw;
+  } catch {
+    // Relative storage key. Normalize below.
   }
-  return url;
+
+  if (raw.startsWith('/api/uploads/')) raw = raw.slice('/api'.length);
+  if (raw.startsWith('api/uploads/')) raw = `/${raw.slice('api/'.length)}`;
+  if (raw.startsWith('/uploads/')) return appBase ? `${appBase}${raw}` : raw;
+  if (raw.startsWith('uploads/')) return appBase ? `${appBase}/${raw}` : `/${raw}`;
+
+  raw = raw.replace(/^\/+/, '');
+  if (raw.startsWith('content/')) {
+    const path = `/uploads/${raw}`;
+    return appBase ? `${appBase}${path}` : path;
+  }
+  if (/^(courses|lid|manifests)\//.test(raw)) {
+    const path = `/uploads/content/${raw}`;
+    return appBase ? `${appBase}${path}` : path;
+  }
+  return raw;
 }
 
 function normalizeLanguage(input: unknown) {

@@ -7,7 +7,7 @@ import { getActiveLiDCatalog, getPublishedLiDManifest } from '../services/lidSer
 import { getMobileCategories, getMobileLessonDetail, getMobileLessons, getMobileLevels, getMobileSeries } from '../services/mobileApiService.js';
 
 export const publicRoutes=Router();
-const VERSION='V77_MYSQL_2026_08_05';
+const VERSION='V80_MYSQL_MEDIA_LOCAL_ONLY_2026_08_05';
 publicRoutes.get('/health',asyncHandler(async(_req,res)=>{let database:any={ok:false};try{database=await pingDatabase();}catch(e){database={ok:false,error:e instanceof Error?e.message:String(e)}}res.json({ok:database.ok,service:'deutschflow-api',version:VERSION,time:new Date().toISOString(),database,configWarnings});}));
 publicRoutes.get('/__version',(_req,res)=>{res.setHeader('Cache-Control','no-store');res.json({app:'DeutschFlow',version:VERSION,database:'mysql'});});
 function sendPretty(req:any,res:any,payload:unknown){res.setHeader('Cache-Control','public, max-age=300');if(String(req.query.pretty??'')==='1'){res.type('application/json').send(JSON.stringify(payload,null,2));return;}res.json(payload);}

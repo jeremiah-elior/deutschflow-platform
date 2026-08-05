@@ -1,0 +1,7 @@
+-- V80: canonicalize stored media URLs. Run once in phpMyAdmin.
+UPDATE chapter_assets SET public_url=CONCAT('https://mydeutschflow.de/uploads/content/',TRIM(LEADING '/' FROM storage_path)) WHERE storage_path IS NOT NULL AND storage_path<>'' AND storage_path NOT REGEXP '^https?://';
+UPDATE chapter_assets SET public_url=REPLACE(public_url,'https://wnkxhlqmelualzsiqzhq.supabase.co/storage/v1/object/public/content/','https://mydeutschflow.de/uploads/content/') WHERE public_url LIKE 'https://wnkxhlqmelualzsiqzhq.supabase.co/storage/v1/object/public/content/%';
+UPDATE chapter_assets SET public_url=REPLACE(public_url,'https://silver-llama-257051.hostingersite.com','https://mydeutschflow.de') WHERE public_url LIKE 'https://silver-llama-257051.hostingersite.com/%';
+UPDATE chapter_translations SET audio_url=REPLACE(audio_url,'https://silver-llama-257051.hostingersite.com','https://mydeutschflow.de') WHERE audio_url LIKE 'https://silver-llama-257051.hostingersite.com/%';
+UPDATE chapter_videos SET video_url=REPLACE(video_url,'https://silver-llama-257051.hostingersite.com','https://mydeutschflow.de'),thumbnail_url=REPLACE(thumbnail_url,'https://silver-llama-257051.hostingersite.com','https://mydeutschflow.de') WHERE video_url LIKE 'https://silver-llama-257051.hostingersite.com/%' OR thumbnail_url LIKE 'https://silver-llama-257051.hostingersite.com/%';
+UPDATE course_series SET cover_url=REPLACE(cover_url,'https://silver-llama-257051.hostingersite.com','https://mydeutschflow.de') WHERE cover_url LIKE 'https://silver-llama-257051.hostingersite.com/%';
