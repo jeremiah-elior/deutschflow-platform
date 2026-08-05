@@ -12,7 +12,7 @@ import { adminRoutes } from './routes/adminRoutes.js';
 
 const app = express();
 
-const VERSION = 'V76_DEPLOY_ROOT_FIX_2026_08_05';
+const VERSION = 'V77_MYSQL_2026_08_05';
 console.log(`DeutschFlow API ${VERSION}`);
 
 app.use(helmet({
@@ -33,15 +33,27 @@ for (const path of ['languages', 'courses', 'chapters', 'vocabulary', 'notes', '
   app.get(`/${path}`, (_req, res) => res.redirect(302, `/admin/${path}`));
 }
 
-// Legacy uploaded media compatibility.
-// Old imported rows can still point to /uploads/... paths. In single-domain mode,
-// those URLs must not fall through to the React admin SPA. Serve local uploads if
-// present; otherwise redirect to the legacy media host until files are migrated
-// into Supabase Storage.
-const uploadsDir = resolve(process.cwd(), 'uploads');
-if (existsSync(uploadsDir)) {
-  console.log(`Serving local uploaded media from ${uploadsDir}`);
-  app.use('/uploads', express.static(uploadsDir, {
+// V77 content storage. UPLOADS_DIR may be relative to the app root or an absolute
+// persistent Hostinger path. It always maps publicly to /uploads/content/*.
+const contentUploadsDir = resolve(process.cwd(), env.UPLOADS_DIR);
+if (existsSync(contentUploadsDir)) {
+  console.log(`Serving DeutschFlow content from ${contentUploadsDir}`);
+  app.use('/uploads/content', express.static(contentUploadsDir, {
+    index: false,
+    maxAge: env.NODE_ENV === 'production' ? '30d' : 0,
+    setHeaders: (res) => {
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('Accept-Ranges', 'bytes');
+    }
+  }));
+}
+
+// Legacy /uploads/* compatibility. Keep this after the V77 content mount so old
+// cover/audio URLs can still resolve from a local legacy uploads folder or fall
+// back to the previous media host while they are gradually copied over.
+const legacyUploadsDir = resolve(process.cwd(), 'uploads');
+if (existsSync(legacyUploadsDir)) {
+  app.use('/uploads', express.static(legacyUploadsDir, {
     index: false,
     maxAge: env.NODE_ENV === 'production' ? '30d' : 0,
     setHeaders: (res) => {

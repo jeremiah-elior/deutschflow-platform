@@ -81,7 +81,7 @@ export function DashboardPage() {
             <div><strong>{counts.transcripts ?? '—'}</strong><span>Transcripts</span></div>
             <div><strong>{counts.chapterAssets ?? '—'}</strong><span>Assets</span></div>
           </div>
-          <p className="muted">The imported data is now stored in Supabase tables and can be previewed in the new dashboards.</p>
+          <p className="muted">The migrated content is now stored in the DeutschFlow MySQL database and can be managed from these dashboards.</p>
         </div>
       </div>
 

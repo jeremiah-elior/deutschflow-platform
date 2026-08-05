@@ -1,4 +1,5 @@
-import { supabaseAdmin } from '../config/supabase.js';
+import { rows } from '../config/db.js';
+import { getCourseBySlug, getLevels, hydrateChapters, getHydratedChapterByClientId } from './chapterDataService.js';
 import { HttpError } from '../utils/http.js';
 
 type AnyRow = Record<string, any>;
@@ -96,11 +97,11 @@ function localized(json: AnyRow | null | undefined, code: string, fallbackCodes:
 
 function getTranslation(chapter: ChapterRow, lang: string) {
   return (chapter.chapter_translations ?? [])
-    .find((item) => item.language_code === lang && item.is_published !== false) ?? null;
+    .find((item) => item.language_code === lang && Boolean(item.is_published)) ?? null;
 }
 
 function getAnyTranslation(chapter: ChapterRow) {
-  return (chapter.chapter_translations ?? []).find((item) => item.is_published !== false) ?? null;
+  return (chapter.chapter_translations ?? []).find((item) => Boolean(item.is_published)) ?? null;
 }
 
 function durationMinutes(rawSecondsOrMinutes: number | null | undefined) {
@@ -118,7 +119,7 @@ function publicAssetUrl(asset: AnyRow | null | undefined) {
 }
 
 function findAsset(chapter: ChapterRow, assetType: string, lang?: string) {
-  const assets = (chapter.chapter_assets ?? []).filter((asset) => asset.is_active !== false && asset.asset_type === assetType);
+  const assets = (chapter.chapter_assets ?? []).filter((asset) => Boolean(asset.is_active) && asset.asset_type === assetType);
   if (lang) {
     const languageAsset = assets.find((asset) => asset.language_code === lang);
     if (languageAsset) return languageAsset;
@@ -144,7 +145,7 @@ function getCoverUrl(chapter: ChapterRow) {
 
 function hasMobileVisibleContent(chapter: ChapterRow, lang: string) {
   // Imported legacy lessons are valid mobile lessons.
-  // New Supabase placeholder chapters from setup/admin should not appear in the mobile list
+  // New placeholder chapters from setup/admin should not appear in the mobile list
   // until they have real language content or media. This prevents empty rows like "Chapter 01"
   // with no audio/title/category from reaching the app.
   if (chapter.legacy_id !== null && chapter.legacy_id !== undefined) return true;
@@ -160,7 +161,7 @@ function hasMobileVisibleContent(chapter: ChapterRow, lang: string) {
 function videoMatches(video: AnyRow, lang: string, fallback: boolean) {
   // v70 migration adds language_code. Existing old video rows are marked te.
   // Null language_code is treated as shared/non-localized content.
-  if (video.is_enabled === false) return false;
+  if (!Boolean(video.is_enabled)) return false;
   if (!video.language_code) return true;
   if (video.language_code === lang) return true;
   return fallback;
@@ -227,63 +228,23 @@ function buildLessonSummary(chapter: ChapterRow, level: LevelRow | undefined, la
 }
 
 async function getGermanCourse() {
-  const { data, error } = await supabaseAdmin
-    .from('courses')
-    .select('id,slug,title_json,description_json')
-    .eq('slug', DEFAULT_COURSE_SLUG)
-    .maybeSingle();
-  if (error) throw new HttpError(500, 'course_fetch_failed', error.message);
+  const data = await getCourseBySlug(DEFAULT_COURSE_SLUG, true);
   if (!data) throw new HttpError(404, 'course_not_found');
   return data as CourseRow;
 }
 
 async function getLevelsForCourse(courseId: string, levelSlug?: string) {
-  let query = supabaseAdmin
-    .from('course_levels')
-    .select('id,legacy_id,slug,title_json,description_json,sort_order')
-    .eq('course_id', courseId)
-    .eq('is_active', true)
-    .order('sort_order');
-  if (levelSlug) query = query.eq('slug', levelSlug.toUpperCase());
-  const { data, error } = await query;
-  if (error) throw new HttpError(500, 'levels_fetch_failed', error.message);
-  return (data ?? []) as LevelRow[];
+  return (await getLevels(courseId, levelSlug, true)) as LevelRow[];
 }
-
-const chapterSelect = `
-  id,legacy_id,level_id,slug,number,title_json,description_json,duration_seconds,is_premium,is_featured,is_active,updated_at,transcript_de,notes_json,
-  category:course_categories(id,name,icon,description),
-  series:course_series(id,title,subtitle,cover_url),
-  chapter_translations(*),
-  chapter_assets(*),
-  chapter_notes(*),
-  chapter_transcripts(*),
-  chapter_vocabulary(*,translations:chapter_vocabulary_translations(*)),
-  chapter_videos(*),
-  chapter_quiz_questions(*)
-`;
 
 async function getChaptersForLevels(levelIds: string[]) {
   if (!levelIds.length) return [] as ChapterRow[];
-  const { data, error } = await supabaseAdmin
-    .from('chapters')
-    .select(chapterSelect)
-    .in('level_id', levelIds)
-    .eq('is_active', true)
-    .order('sort_order', { ascending: true });
-  if (error) throw new HttpError(500, 'chapters_fetch_failed', error.message);
-  return (data ?? []) as ChapterRow[];
+  const placeholders = levelIds.map(() => '?').join(',');
+  return (await hydrateChapters(`c.level_id IN (${placeholders})`, levelIds, true)) as ChapterRow[];
 }
 
 async function getChapterByClientId(id: string) {
-  const numericId = asInt(id);
-  let query = supabaseAdmin.from('chapters').select(chapterSelect).limit(1);
-  query = numericId !== null && String(numericId) === id
-    ? query.eq('legacy_id', numericId)
-    : query.eq('id', id);
-  const { data, error } = await query;
-  if (error) throw new HttpError(500, 'chapter_fetch_failed', error.message);
-  const chapter = ((data ?? [])[0] ?? null) as ChapterRow | null;
+  const chapter = await getHydratedChapterByClientId(id) as ChapterRow | null;
   if (!chapter) throw new HttpError(404, 'lesson_not_found');
   return chapter;
 }
@@ -331,7 +292,7 @@ export async function getMobileLessonVideos(id: string, langInput: unknown, fall
       videoUrl: normalizeMediaUrl(video.video_url),
       thumbnailUrl: normalizeMediaUrl(video.thumbnail_url) ?? null,
       durationSeconds: video.duration_seconds ?? 0,
-      isEnabled: video.is_enabled !== false,
+      isEnabled: Boolean(video.is_enabled),
       isPremium: Boolean(video.is_premium),
       sortOrder: video.sort_order ?? 0
     }));
@@ -452,7 +413,7 @@ function answerIndex(correctOption: unknown) {
 }
 
 function quizMatches(quiz: AnyRow, lang: string, fallback: boolean) {
-  if (quiz.is_active === false) return false;
+  if (!Boolean(quiz.is_active)) return false;
   if (!quiz.language_code) return true;
   if (quiz.language_code === lang) return true;
   return fallback;
@@ -515,14 +476,8 @@ export async function getMobileLessonDetail(params: { id?: unknown; lang?: unkno
 
 export async function getMobileCategories() {
   const course = await getGermanCourse();
-  const { data, error } = await supabaseAdmin
-    .from('course_categories')
-    .select('id,legacy_id,name,icon,description,is_active,sort_order')
-    .eq('course_id', course.id)
-    .eq('is_active', true)
-    .order('sort_order');
-  if (error) throw new HttpError(500, 'categories_fetch_failed', error.message);
-  return { success: true, categories: (data ?? []).map((item: AnyRow) => ({ id: item.legacy_id ?? item.id, uuid: item.id, name: item.name, icon: item.icon, description: item.description, sortOrder: item.sort_order ?? 0 })) };
+  const data = await rows<any>('SELECT id,legacy_id,name,icon,description,is_active,sort_order FROM course_categories WHERE course_id=? AND is_active=1 ORDER BY sort_order', [course.id]);
+  return { success: true, categories: data.map((item: AnyRow) => ({ id: item.legacy_id ?? item.id, uuid: item.id, name: item.name, icon: item.icon, description: item.description, sortOrder: item.sort_order ?? 0 })) };
 }
 
 export async function getMobileLevels() {
@@ -533,12 +488,6 @@ export async function getMobileLevels() {
 
 export async function getMobileSeries() {
   const course = await getGermanCourse();
-  const { data, error } = await supabaseAdmin
-    .from('course_series')
-    .select('id,legacy_id,title,subtitle,description,cover_url,is_featured,is_active')
-    .eq('course_id', course.id)
-    .eq('is_active', true)
-    .order('title');
-  if (error) throw new HttpError(500, 'series_fetch_failed', error.message);
-  return { success: true, series: (data ?? []).map((item: AnyRow) => ({ id: item.legacy_id ?? item.id, uuid: item.id, title: item.title, subtitle: item.subtitle, description: item.description, coverUrl: normalizeMediaUrl(item.cover_url), isFeatured: Boolean(item.is_featured) })) };
+  const data = await rows<any>('SELECT id,legacy_id,title,subtitle,description,cover_url,is_featured,is_active FROM course_series WHERE course_id=? AND is_active=1 ORDER BY title', [course.id]);
+  return { success: true, series: data.map((item: AnyRow) => ({ id: item.legacy_id ?? item.id, uuid: item.id, title: item.title, subtitle: item.subtitle, description: item.description, coverUrl: normalizeMediaUrl(item.cover_url), isFeatured: Boolean(item.is_featured) })) };
 }

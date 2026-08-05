@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 const apiServer = resolve(process.cwd(), 'apps/api/dist/server.js');
 const adminIndex = resolve(process.cwd(), 'dist/index.html');
 const buildStamp = resolve(process.cwd(), 'dist/.deutschflow-build-version');
-const EXPECTED_BUILD = 'V76_PUBLIC_SITE_BUILD_2026_08_05';
+const EXPECTED_BUILD = 'V77_MYSQL_PUBLIC_SITE_2026_08_05';
 
 function hasCurrentAdminBuild() {
   if (!existsSync(adminIndex) || !existsSync(buildStamp)) return false;

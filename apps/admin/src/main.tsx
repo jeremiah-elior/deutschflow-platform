@@ -13,9 +13,8 @@ import { NotFoundPage } from './pages/public/NotFoundPage';
 import './styles/global.css';
 import './styles/public.css';
 
-// Keep Supabase/admin code out of the public bundle's initial execution path.
-// This lets public/legal pages render even when an admin-specific VITE_* value
-// is temporarily missing or misconfigured during deployment.
+// Keep the authenticated admin application out of the public bundle's initial execution path.
+// Public and legal pages can render independently of the admin session/API.
 const AdminApp = lazy(() => import('./AdminApp'));
 
 function AdminLoader() {

@@ -37,7 +37,7 @@ export function PrivacyPolicyPage() {
           <li><strong>Google Firebase:</strong> user authentication and related identity services.</li>
           <li><strong>Google Sign-In:</strong> optional authentication when selected by the user.</li>
           <li><strong>Apple:</strong> optional Sign in with Apple authentication on supported devices.</li>
-          <li><strong>Supabase:</strong> backend infrastructure used for DeutschFlow content and administrative services.</li>
+          <li><strong>Hostinger:</strong> web/API hosting, MySQL database hosting and delivery of DeutschFlow learning content.</li>
           <li><strong>Hosting providers:</strong> web/API hosting and delivery of DeutschFlow services.</li>
         </ul>
         <p>These providers process data under their own security and privacy obligations. Depending on the provider and infrastructure, data may be processed outside the European Economic Area subject to the applicable transfer safeguards.</p>

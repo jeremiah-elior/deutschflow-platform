@@ -63,7 +63,7 @@ export function LiDPage() {
           }} />
           <label>Storage path<input value={jsonPath} onChange={(e) => setJsonPath(e.target.value)} /></label>
           <button className="primaryButton" onClick={importJson} disabled={!jsonPath}>Import 460 cards</button>
-          <p className="hint">This stores cards in Postgres and keeps catalog_id as the stable app key.</p>
+          <p className="hint">This stores cards in MySQL and keeps catalog_id as the stable app key.</p>
         </div>
         <div className="panel formStack">
           <h2>2. Upload LiD assets</h2>

@@ -1,8 +1,8 @@
 {
   "name": "deutschflow-platform",
   "private": true,
-  "version": "1.0.12",
-  "description": "DeutschFlow V76 single-domain backend with public website, legal pages, protected admin, and flat-root Hostinger deployment verification.",
+  "version": "1.0.14",
+  "description": "DeutschFlow V78 MySQL backend - Hostinger deployment-build fix; no runtime npm/build calls.",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -14,22 +14,28 @@
     "lint": "npm run lint -w @deutschflow/api && npm run lint -w @deutschflow/admin",
     "build:admin": "npm run build -w @deutschflow/shared && npm run build -w @deutschflow/admin && node scripts/copy-admin-dist.mjs",
     "build:api": "npm run build -w @deutschflow/shared && npm run build -w @deutschflow/api",
-    "import:legacy": "node scripts/import-legacy-mysql.mjs",
     "build:single-domain": "npm run build",
     "start:single-domain": "node server.js",
     "start": "node server.js",
     "hostinger:build": "npm run build",
     "hostinger:start": "node server.js",
-    "postinstall": "node scripts/hostinger-postinstall.mjs",
-    "prestart": "node scripts/ensure-build.mjs"
-  },
-  "devDependencies": {
-    "concurrently": "^8.2.2",
-    "typescript": "^5.5.4"
+    "postinstall": "npm run build",
+    "db:migrate": "node scripts/mysql-migrate.mjs",
+    "storage:import": "node scripts/import-storage-backup.mjs",
+    "admin:set-password": "node scripts/set-admin-password.mjs",
+    "admin:create": "node scripts/create-admin.mjs",
+    "build:check": "node scripts/ensure-build.mjs"
   },
   "engines": {
     "node": ">=20.0.0",
     "npm": ">=10.0.0"
   },
-  "main": "server.js"
+  "main": "server.js",
+  "dependencies": {
+    "mysql2": "^3.14.3",
+    "dotenv": "^16.4.5",
+    "bcryptjs": "^3.0.2",
+    "concurrently": "^8.2.2",
+    "typescript": "^5.5.4"
+  }
 }

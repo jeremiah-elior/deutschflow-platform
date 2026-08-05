@@ -15,5 +15,5 @@ if (existsSync(target)) {
 
 mkdirSync(target, { recursive: true });
 cpSync(source, target, { recursive: true });
-writeFileSync(resolve(target, '.deutschflow-build-version'), 'V76_PUBLIC_SITE_BUILD_2026_08_05\n');
-console.log(`Copied admin build output to ${target} with V75 build stamp`);
+writeFileSync(resolve(target, '.deutschflow-build-version'), 'V77_MYSQL_PUBLIC_SITE_2026_08_05\n');
+console.log(`Copied admin build output to ${target} with V77 build stamp`);
