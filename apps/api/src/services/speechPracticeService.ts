@@ -102,7 +102,8 @@ async function googlePost(url: string, payload: unknown) {
   try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
   if (!response.ok) {
     console.error('Google Speech API error:', response.status, json);
-    throw new HttpError(502, `google_speech_${response.status}`);
+    const googleMessage = typeof json?.error?.message === 'string' ? json.error.message : undefined;
+    throw new HttpError(502, `google_speech_${response.status}`, googleMessage ? { googleMessage } : undefined);
   }
   return json;
 }
@@ -156,9 +157,13 @@ type GoogleSpeechEncoding = 'LINEAR16' | 'MP3' | 'FLAC';
 function recognitionEncoding(mimeType = '', filename = ''): GoogleSpeechEncoding | undefined {
   const mime = mimeType.trim().toLowerCase();
   const name = filename.trim().toLowerCase();
-  if (mime === 'audio/wav' || mime === 'audio/x-wav' || mime === 'audio/wave' || name.endsWith('.wav')) return 'LINEAR16';
+
+  // V85: WAV and FLAC carry their encoding/sample-rate metadata in the file header.
+  // Google explicitly supports header auto-detection for these containers. The iOS app
+  // records a 16 kHz mono PCM WAV, so omitting `encoding` avoids a config/header mismatch.
+  if (mime === 'audio/wav' || mime === 'audio/x-wav' || mime === 'audio/wave' || name.endsWith('.wav')) return undefined;
+  if (mime === 'audio/flac' || name.endsWith('.flac')) return undefined;
   if (mime === 'audio/mpeg' || mime === 'audio/mp3' || name.endsWith('.mp3')) return 'MP3';
-  if (mime === 'audio/flac' || name.endsWith('.flac')) return 'FLAC';
   return undefined;
 }
 
