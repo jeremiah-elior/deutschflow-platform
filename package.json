@@ -1,8 +1,8 @@
 {
   "name": "deutschflow-platform",
   "private": true,
-  "version": "1.0.15",
-  "description": "DeutschFlow V79 MySQL backend - fixes admin TypeScript build after MySQL auth migration.",
+  "version": "1.0.17",
+  "description": "DeutschFlow V83 MySQL backend with fixed Google Chirp 3 HD synthesis and Google German reading recognition.",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -36,6 +36,7 @@
     "dotenv": "^16.4.5",
     "bcryptjs": "^3.0.2",
     "concurrently": "^8.2.2",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "google-auth-library": "^9.15.1"
   }
 }

@@ -4,7 +4,7 @@ const { existsSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { pathToFileURL } = require('node:url');
 
-const VERSION = 'V81_MYSQL_MEDIA_SYNTAX_FIX_2026_08_05';
+const VERSION = 'V82_MYSQL_GOOGLE_SPEECH_2026_08_08';
 const compiledServer = resolve(process.cwd(), 'apps/api/dist/server.js');
 const adminIndex = resolve(process.cwd(), 'dist/index.html');
 

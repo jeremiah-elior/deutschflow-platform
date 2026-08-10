@@ -17,7 +17,13 @@ const RawEnvSchema = z.object({
   UPLOADS_DIR: z.string().default('uploads/content'),
   ADMIN_JWT_SECRET: z.string().optional(),
   ADMIN_COOKIE_NAME: z.string().default('df_admin'),
-  ENABLE_DEV_ADMIN_BYPASS: z.enum(['true', 'false']).default('false')
+  ENABLE_DEV_ADMIN_BYPASS: z.enum(['true', 'false']).default('false'),
+  GOOGLE_SPEECH_ENABLED: z.enum(['true', 'false']).default('false'),
+  GOOGLE_SERVICE_ACCOUNT_JSON: z.string().default(''),
+  GOOGLE_SERVICE_ACCOUNT_JSON_BASE64: z.string().default(''),
+  GOOGLE_TTS_VOICE: z.string().default('de-DE-Chirp3-HD-Leda'),
+  GOOGLE_TTS_SPEAKING_RATE: z.coerce.number().min(0.25).max(2).default(0.86),
+  SPEECH_UPLOAD_MAX_BYTES: z.coerce.number().int().positive().default(2500000)
 });
 
 const rawEnv = RawEnvSchema.parse(process.env);
@@ -49,8 +55,18 @@ export const env = {
   UPLOADS_DIR: rawEnv.UPLOADS_DIR,
   ADMIN_JWT_SECRET: required('ADMIN_JWT_SECRET', 'CHANGE-ME-IN-PRODUCTION'),
   ADMIN_COOKIE_NAME: rawEnv.ADMIN_COOKIE_NAME,
-  ENABLE_DEV_ADMIN_BYPASS: rawEnv.ENABLE_DEV_ADMIN_BYPASS
+  ENABLE_DEV_ADMIN_BYPASS: rawEnv.ENABLE_DEV_ADMIN_BYPASS,
+  GOOGLE_SPEECH_ENABLED: rawEnv.GOOGLE_SPEECH_ENABLED === 'true',
+  GOOGLE_SERVICE_ACCOUNT_JSON: rawEnv.GOOGLE_SERVICE_ACCOUNT_JSON,
+  GOOGLE_SERVICE_ACCOUNT_JSON_BASE64: rawEnv.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64,
+  GOOGLE_TTS_VOICE: rawEnv.GOOGLE_TTS_VOICE,
+  GOOGLE_TTS_SPEAKING_RATE: rawEnv.GOOGLE_TTS_SPEAKING_RATE,
+  SPEECH_UPLOAD_MAX_BYTES: rawEnv.SPEECH_UPLOAD_MAX_BYTES
 };
 
 export const isProduction = env.NODE_ENV === 'production';
 if (isProduction && env.ADMIN_JWT_SECRET === 'CHANGE-ME-IN-PRODUCTION') configWarnings.push('ADMIN_JWT_SECRET must be changed in production');
+
+if (env.GOOGLE_SPEECH_ENABLED && !env.GOOGLE_SERVICE_ACCOUNT_JSON.trim() && !env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64.trim() && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  configWarnings.push('Google speech is enabled but no service-account credentials/ADC path is configured');
+}
