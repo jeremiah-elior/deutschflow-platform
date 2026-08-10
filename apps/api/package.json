@@ -1,6 +1,6 @@
 {
   "name": "@deutschflow/api",
-  "version": "0.0.84",
+  "version": "0.0.86",
   "type": "module",
   "main": "dist/server.js",
   "scripts": {

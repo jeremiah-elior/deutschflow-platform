@@ -46,25 +46,38 @@ const readingContent: Record<string, Omit<ReadingPracticeAsset, 'audioUrl' | 'vo
 
 let cachedAuth: GoogleAuth | null = null;
 
+type GoogleOperation = 'tts' | 'stt';
+type GoogleSpeechEncoding = 'LINEAR16' | 'MP3' | 'FLAC';
+
+type WavInfo = {
+  audioFormat: number;
+  channels: number;
+  sampleRate: number;
+  bitsPerSample: number;
+  dataBytes: number;
+};
+
 function googleAuth() {
   if (cachedAuth) return cachedAuth;
 
   const scopes = ['https://www.googleapis.com/auth/cloud-platform'];
   const rawCredentials = env.GOOGLE_SERVICE_ACCOUNT_JSON.trim();
   const base64Credentials = env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64.trim();
+
   if (rawCredentials || base64Credentials) {
     try {
       const jsonText = rawCredentials || Buffer.from(base64Credentials, 'base64').toString('utf8');
       const credentials = JSON.parse(jsonText);
       cachedAuth = new GoogleAuth({ credentials, scopes });
       return cachedAuth;
-    } catch {
-      throw new HttpError(500, 'Google service account credentials are not valid JSON/base64 JSON');
+    } catch (error) {
+      console.error('Google Speech credential parse error:', error);
+      throw new HttpError(503, 'speech_service_not_configured');
     }
   }
 
-  // Supports Application Default Credentials when deployed in an environment
-  // where GOOGLE_APPLICATION_CREDENTIALS or workload credentials are available.
+  // ADC is still supported for platforms that provide workload credentials or a mounted
+  // GOOGLE_APPLICATION_CREDENTIALS file. Hostinger production currently uses Base64 JSON.
   cachedAuth = new GoogleAuth({ scopes });
   return cachedAuth;
 }
@@ -73,6 +86,7 @@ async function accessToken() {
   if (!env.GOOGLE_SPEECH_ENABLED) {
     throw new HttpError(503, 'speech_service_disabled');
   }
+
   try {
     const client = await googleAuth().getClient();
     const token = await client.getAccessToken();
@@ -80,12 +94,44 @@ async function accessToken() {
     if (!value) throw new Error('empty access token');
     return value;
   } catch (error) {
+    if (error instanceof HttpError) throw error;
     console.error('Google Speech auth error:', error);
     throw new HttpError(503, 'speech_service_not_configured');
   }
 }
 
-async function googlePost(url: string, payload: unknown) {
+function providerDetails(status: number, json: any) {
+  const providerMessage = typeof json?.error?.message === 'string' ? json.error.message : undefined;
+  const providerCode = typeof json?.error?.status === 'string' ? json.error.status : undefined;
+  return {
+    provider: 'google',
+    providerStatus: status,
+    ...(providerCode ? { providerCode } : {}),
+    ...(providerMessage ? { providerMessage } : {})
+  };
+}
+
+function mapGoogleFailure(operation: GoogleOperation, status: number, json: any): HttpError {
+  const details = providerDetails(status, json);
+
+  if (status === 400) {
+    return operation === 'stt'
+      ? new HttpError(422, 'speech_audio_rejected', details)
+      : new HttpError(502, 'speech_tts_request_rejected', details);
+  }
+  if (status === 401 || status === 403) {
+    return new HttpError(503, 'speech_provider_auth_failed', details);
+  }
+  if (status === 429) {
+    return new HttpError(429, 'speech_provider_rate_limited', details);
+  }
+  if (status >= 500) {
+    return new HttpError(503, 'speech_provider_unavailable', details);
+  }
+  return new HttpError(502, 'speech_provider_error', details);
+}
+
+async function googlePost(operation: GoogleOperation, url: string, payload: unknown) {
   const token = await accessToken();
   const response = await fetch(url, {
     method: 'POST',
@@ -99,11 +145,15 @@ async function googlePost(url: string, payload: unknown) {
 
   const text = await response.text();
   let json: any = {};
-  try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
+  try {
+    json = text ? JSON.parse(text) : {};
+  } catch {
+    json = { raw: text };
+  }
+
   if (!response.ok) {
-    console.error('Google Speech API error:', response.status, json);
-    const googleMessage = typeof json?.error?.message === 'string' ? json.error.message : undefined;
-    throw new HttpError(502, `google_speech_${response.status}`, googleMessage ? { googleMessage } : undefined);
+    console.error(`Google ${operation.toUpperCase()} API error:`, response.status, json);
+    throw mapGoogleFailure(operation, response.status, json);
   }
   return json;
 }
@@ -126,9 +176,8 @@ function readingCachePaths(lessonId: string) {
 }
 
 function googleTtsAudioConfig() {
-  // Google Chirp 3 HD currently rejects speakingRate/pitch audio parameters.
-  // Keep the generated narration at its natural voice speed and let the
-  // native app apply the A1 playback rate locally with AVPlayer.
+  // Chirp 3 HD rejects speakingRate/pitch synthesis parameters. Generate once at native
+  // speed and let AVPlayer control learner playback speed locally.
   const isChirp3HD = /-Chirp3-HD-/i.test(env.GOOGLE_TTS_VOICE);
   return {
     audioEncoding: 'MP3',
@@ -137,7 +186,7 @@ function googleTtsAudioConfig() {
 }
 
 async function synthesizeReading(text: string): Promise<Buffer> {
-  const response = await googlePost('https://texttospeech.googleapis.com/v1/text:synthesize', {
+  const response = await googlePost('tts', 'https://texttospeech.googleapis.com/v1/text:synthesize', {
     input: { text },
     voice: {
       languageCode: 'de-DE',
@@ -152,24 +201,93 @@ async function synthesizeReading(text: string): Promise<Buffer> {
   return Buffer.from(response.audioContent, 'base64');
 }
 
-type GoogleSpeechEncoding = 'LINEAR16' | 'MP3' | 'FLAC';
+function isWavUpload(mimeType = '', filename = '') {
+  const mime = mimeType.trim().toLowerCase();
+  const name = filename.trim().toLowerCase();
+  return mime === 'audio/wav' || mime === 'audio/x-wav' || mime === 'audio/wave' || name.endsWith('.wav');
+}
+
+function isFlacUpload(mimeType = '', filename = '') {
+  const mime = mimeType.trim().toLowerCase();
+  const name = filename.trim().toLowerCase();
+  return mime === 'audio/flac' || name.endsWith('.flac');
+}
+
+function inspectWav(audio: Buffer): WavInfo {
+  if (audio.length < 44 || audio.toString('ascii', 0, 4) !== 'RIFF' || audio.toString('ascii', 8, 12) !== 'WAVE') {
+    throw new HttpError(422, 'speech_audio_invalid_wav');
+  }
+
+  let offset = 12;
+  let format: Omit<WavInfo, 'dataBytes'> | null = null;
+  let dataBytes = 0;
+
+  while (offset + 8 <= audio.length) {
+    const chunkId = audio.toString('ascii', offset, offset + 4);
+    const chunkSize = audio.readUInt32LE(offset + 4);
+    const chunkStart = offset + 8;
+    const chunkEnd = chunkStart + chunkSize;
+    if (chunkEnd > audio.length) break;
+
+    if (chunkId === 'fmt ' && chunkSize >= 16) {
+      format = {
+        audioFormat: audio.readUInt16LE(chunkStart),
+        channels: audio.readUInt16LE(chunkStart + 2),
+        sampleRate: audio.readUInt32LE(chunkStart + 4),
+        bitsPerSample: audio.readUInt16LE(chunkStart + 14)
+      };
+    } else if (chunkId === 'data') {
+      dataBytes = chunkSize;
+    }
+
+    // RIFF chunks are padded to an even byte boundary.
+    offset = chunkEnd + (chunkSize % 2);
+  }
+
+  if (!format || dataBytes <= 0) {
+    throw new HttpError(422, 'speech_audio_invalid_wav');
+  }
+
+  const info: WavInfo = { ...format, dataBytes };
+  const supported =
+    info.audioFormat === 1 &&
+    info.channels === 1 &&
+    info.bitsPerSample === 16 &&
+    info.sampleRate >= 8_000 &&
+    info.sampleRate <= 48_000;
+
+  if (!supported) {
+    throw new HttpError(422, 'speech_audio_unsupported_wav', {
+      audioFormat: info.audioFormat,
+      channels: info.channels,
+      sampleRate: info.sampleRate,
+      bitsPerSample: info.bitsPerSample
+    });
+  }
+
+  // At 16 kHz / mono / 16-bit this is roughly 50 ms. Anything smaller is almost
+  // certainly an empty/unfinished recording rather than a spoken sentence.
+  if (info.dataBytes < 1_600) {
+    throw new HttpError(422, 'speech_audio_too_short');
+  }
+
+  return info;
+}
 
 function recognitionEncoding(mimeType = '', filename = ''): GoogleSpeechEncoding | undefined {
   const mime = mimeType.trim().toLowerCase();
   const name = filename.trim().toLowerCase();
 
-  // V85: WAV and FLAC carry their encoding/sample-rate metadata in the file header.
-  // Google explicitly supports header auto-detection for these containers. The iOS app
-  // records a 16 kHz mono PCM WAV, so omitting `encoding` avoids a config/header mismatch.
-  if (mime === 'audio/wav' || mime === 'audio/x-wav' || mime === 'audio/wave' || name.endsWith('.wav')) return undefined;
-  if (mime === 'audio/flac' || name.endsWith('.flac')) return undefined;
+  // WAV/FLAC contain their own format headers. Google Speech can derive the encoding from
+  // those headers; specifying a mismatched encoding causes INVALID_ARGUMENT.
+  if (isWavUpload(mimeType, filename) || isFlacUpload(mimeType, filename)) return undefined;
   if (mime === 'audio/mpeg' || mime === 'audio/mp3' || name.endsWith('.mp3')) return 'MP3';
   return undefined;
 }
 
 async function transcribeWithWordTimings(audio: Buffer, expectedWords: string[] = [], encoding?: GoogleSpeechEncoding) {
   const speechContexts = expectedWords.length ? [{ phrases: expectedWords.slice(0, 200), boost: 12 }] : undefined;
-  const response = await googlePost('https://speech.googleapis.com/v1/speech:recognize', {
+  const response = await googlePost('stt', 'https://speech.googleapis.com/v1/speech:recognize', {
     config: {
       ...(encoding ? { encoding } : {}),
       languageCode: 'de-DE',
@@ -184,7 +302,11 @@ async function transcribeWithWordTimings(audio: Buffer, expectedWords: string[] 
   const alternatives = (response.results ?? [])
     .flatMap((result: any) => Array.isArray(result?.alternatives) ? result.alternatives.slice(0, 1) : []);
 
-  const transcript = alternatives.map((alternative: any) => String(alternative?.transcript ?? '')).join(' ').trim();
+  const transcript = alternatives
+    .map((alternative: any) => String(alternative?.transcript ?? ''))
+    .join(' ')
+    .trim();
+
   const words: ReadingWordTiming[] = alternatives.flatMap((alternative: any) =>
     (alternative?.words ?? []).map((item: any) => ({
       word: String(item.word ?? ''),
@@ -226,7 +348,7 @@ export async function getReadingPracticeAsset(lessonId: string): Promise<Reading
     const timed = await transcribeWithWordTimings(audio, expectedWords, 'MP3');
     words = timed.words;
   } catch (error) {
-    // Natural audio remains useful even if timing generation temporarily fails.
+    // The narration is still useful if timing generation temporarily fails.
     console.warn('Reading word timing generation failed:', error);
   }
 
@@ -244,9 +366,14 @@ export async function recognizeReadingAudio(audio: Buffer, expectedText: string,
   if (!audio.length) throw new HttpError(400, 'audio_required');
   if (audio.length > env.SPEECH_UPLOAD_MAX_BYTES) throw new HttpError(413, 'audio_too_large');
 
+  if (isWavUpload(mimeType, filename)) {
+    inspectWav(audio);
+  }
+
   const phrases = expectedText.match(/[\p{L}\p{N}ÄÖÜäöüß]+/gu) ?? [];
   const encoding = recognitionEncoding(mimeType, filename);
   const result = await transcribeWithWordTimings(audio, phrases, encoding);
+
   return {
     transcript: result.transcript,
     confidence: result.confidence,
