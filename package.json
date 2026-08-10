@@ -1,7 +1,7 @@
 {
   "name": "deutschflow-platform",
   "private": true,
-  "version": "1.0.17",
+  "version": "0.0.84",
   "description": "DeutschFlow V83 MySQL backend with fixed Google Chirp 3 HD synthesis and Google German reading recognition.",
   "workspaces": [
     "apps/*",

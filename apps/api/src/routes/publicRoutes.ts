@@ -9,7 +9,7 @@ import { getMobileCategories, getMobileLessonDetail, getMobileLessons, getMobile
 import { getReadingPracticeAsset, recognizeReadingAudio } from '../services/speechPracticeService.js';
 
 export const publicRoutes=Router();
-const VERSION='V83_MYSQL_GOOGLE_SPEECH_FIX_2026_08_08';
+const VERSION='V84_MYSQL_STT_ENCODING_FIX_2026_08_10';
 publicRoutes.get('/health',asyncHandler(async(_req,res)=>{let database:any={ok:false};try{database=await pingDatabase();}catch(e){database={ok:false,error:e instanceof Error?e.message:String(e)}}res.json({ok:database.ok,service:'deutschflow-api',version:VERSION,time:new Date().toISOString(),database,configWarnings});}));
 publicRoutes.get('/__version',(_req,res)=>{res.setHeader('Cache-Control','no-store');res.json({app:'DeutschFlow',version:VERSION,database:'mysql'});});
 function sendPretty(req:any,res:any,payload:unknown){res.setHeader('Cache-Control','public, max-age=300');if(String(req.query.pretty??'')==='1'){res.type('application/json').send(JSON.stringify(payload,null,2));return;}res.json(payload);}
@@ -67,7 +67,7 @@ publicRoutes.post('/api/practice/speech-recognize.php', speechUpload.single('aud
   const expectedText=String(req.body?.expectedText??'').trim();
   if(!expectedText) throw new HttpError(400,'expected_text_required');
   if(expectedText.length>500) throw new HttpError(400,'expected_text_too_long');
-  const recognition=await recognizeReadingAudio(req.file.buffer,expectedText);
+  const recognition=await recognizeReadingAudio(req.file.buffer,expectedText,String(req.file.mimetype??''),String(req.file.originalname??''));
   res.setHeader('Cache-Control','no-store');
   res.json({success:true,language:'de-DE',...recognition});
 }));

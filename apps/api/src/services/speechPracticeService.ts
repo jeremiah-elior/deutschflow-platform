@@ -151,7 +151,18 @@ async function synthesizeReading(text: string): Promise<Buffer> {
   return Buffer.from(response.audioContent, 'base64');
 }
 
-async function transcribeWithWordTimings(audio: Buffer, expectedWords: string[] = [], encoding?: 'MP3') {
+type GoogleSpeechEncoding = 'LINEAR16' | 'MP3' | 'FLAC';
+
+function recognitionEncoding(mimeType = '', filename = ''): GoogleSpeechEncoding | undefined {
+  const mime = mimeType.trim().toLowerCase();
+  const name = filename.trim().toLowerCase();
+  if (mime === 'audio/wav' || mime === 'audio/x-wav' || mime === 'audio/wave' || name.endsWith('.wav')) return 'LINEAR16';
+  if (mime === 'audio/mpeg' || mime === 'audio/mp3' || name.endsWith('.mp3')) return 'MP3';
+  if (mime === 'audio/flac' || name.endsWith('.flac')) return 'FLAC';
+  return undefined;
+}
+
+async function transcribeWithWordTimings(audio: Buffer, expectedWords: string[] = [], encoding?: GoogleSpeechEncoding) {
   const speechContexts = expectedWords.length ? [{ phrases: expectedWords.slice(0, 200), boost: 12 }] : undefined;
   const response = await googlePost('https://speech.googleapis.com/v1/speech:recognize', {
     config: {
@@ -224,12 +235,13 @@ export async function getReadingPracticeAsset(lessonId: string): Promise<Reading
   return { ...content, ...meta, audioUrl: paths.audioUrl };
 }
 
-export async function recognizeReadingAudio(audio: Buffer, expectedText: string) {
+export async function recognizeReadingAudio(audio: Buffer, expectedText: string, mimeType = '', filename = '') {
   if (!audio.length) throw new HttpError(400, 'audio_required');
   if (audio.length > env.SPEECH_UPLOAD_MAX_BYTES) throw new HttpError(413, 'audio_too_large');
 
   const phrases = expectedText.match(/[\p{L}\p{N}ÄÖÜäöüß]+/gu) ?? [];
-  const result = await transcribeWithWordTimings(audio, phrases);
+  const encoding = recognitionEncoding(mimeType, filename);
+  const result = await transcribeWithWordTimings(audio, phrases, encoding);
   return {
     transcript: result.transcript,
     confidence: result.confidence,
