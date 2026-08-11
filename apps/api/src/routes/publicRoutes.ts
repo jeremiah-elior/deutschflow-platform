@@ -9,12 +9,13 @@ import { getMobileCategories, getMobileLessonDetail, getMobileLessons, getMobile
 import { getReadingPracticeAsset, recognizeReadingAudio } from '../services/speechPracticeService.js';
 
 export const publicRoutes=Router();
-const VERSION='V87_MYSQL_FAST_MOBILE_API_2026_08_11';
+const VERSION='V88_MOBILE_AUDIO_RESUME_CORE_2026_08_11';
 publicRoutes.get('/health',asyncHandler(async(_req,res)=>{let database:any={ok:false};try{database=await pingDatabase();}catch(e){database={ok:false,error:e instanceof Error?e.message:String(e)}}res.json({ok:database.ok,service:'deutschflow-api',version:VERSION,time:new Date().toISOString(),database,configWarnings});}));
 publicRoutes.get('/__version',(_req,res)=>{res.setHeader('Cache-Control','no-store');res.json({app:'DeutschFlow',version:VERSION,database:'mysql'});});
-function sendPretty(req:any,res:any,payload:unknown){res.setHeader('Cache-Control','public, max-age=300');if(String(req.query.pretty??'')==='1'){res.type('application/json').send(JSON.stringify(payload,null,2));return;}res.json(payload);}
+function sendPretty(req:any,res:any,payload:unknown){res.setHeader('Cache-Control','public, max-age=30, stale-while-revalidate=300');if(String(req.query.pretty??'')==='1'){res.type('application/json').send(JSON.stringify(payload,null,2));return;}res.json(payload);}
 publicRoutes.get('/api/health.php',asyncHandler(async(_req,res)=>res.json({ok:true,success:true,service:'deutschflow-api',database:await pingDatabase(),time:new Date().toISOString(),configWarnings})));
 publicRoutes.get('/api/lessons.php',asyncHandler(async(req,res)=>sendPretty(req,res,await getMobileLessons({lang:req.query.lang,level:req.query.level,legacy:req.query.legacy}))));
+publicRoutes.get('/v1/mobile/lessons',asyncHandler(async(req,res)=>{const started=Date.now();const payload=await getMobileLessons({lang:req.query.lang,level:req.query.level,legacy:req.query.legacy});const elapsed=Date.now()-started;res.setHeader('Cache-Control','public, max-age=30, stale-while-revalidate=300');res.setHeader('Server-Timing',`app;dur=${elapsed}`);res.setHeader('X-DeutschFlow-API-Ms',String(elapsed));res.json(payload);}));
 publicRoutes.get('/api/lesson-detail.php',asyncHandler(async(req,res)=>sendPretty(req,res,await getMobileLessonDetail({id:req.query.id,lang:req.query.lang,section:req.query.section,fallback:req.query.fallback}))));
 publicRoutes.get('/api/categories.php',asyncHandler(async(req,res)=>sendPretty(req,res,await getMobileCategories())));
 publicRoutes.get('/api/levels.php',asyncHandler(async(req,res)=>sendPretty(req,res,await getMobileLevels())));

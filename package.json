@@ -1,8 +1,8 @@
 {
   "name": "deutschflow-platform",
   "private": true,
-  "version": "0.0.87",
-  "description": "DeutschFlow V87 production backend with fast relation-scoped mobile APIs, MySQL, and Google Read & Speak.",
+  "version": "0.0.88",
+  "description": "DeutschFlow V88 production backend with one-query language-aware mobile audio bootstrap, resumable iOS playback metadata, MySQL, and Google Read & Speak.",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -24,7 +24,9 @@
     "storage:import": "node scripts/import-storage-backup.mjs",
     "admin:set-password": "node scripts/set-admin-password.mjs",
     "admin:create": "node scripts/create-admin.mjs",
-    "build:check": "node scripts/ensure-build.mjs"
+    "build:check": "node scripts/ensure-build.mjs",
+    "verify:mobile-audio": "node scripts/verify-mobile-audio.mjs",
+    "db:optimize-mobile": "node scripts/ensure-mobile-indexes.mjs"
   },
   "engines": {
     "node": ">=20.0.0",

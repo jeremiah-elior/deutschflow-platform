@@ -12,7 +12,7 @@ import { adminRoutes } from './routes/adminRoutes.js';
 
 const app = express();
 
-const VERSION = 'V87_MYSQL_FAST_MOBILE_API_2026_08_11';
+const VERSION = 'V88_MOBILE_AUDIO_RESUME_CORE_2026_08_11';
 console.log(`DeutschFlow API ${VERSION}`);
 
 app.use(helmet({
@@ -40,10 +40,12 @@ if (existsSync(contentUploadsDir)) {
   console.log(`Serving DeutschFlow content from ${contentUploadsDir}`);
   app.use('/uploads/content', express.static(contentUploadsDir, {
     index: false,
-    maxAge: env.NODE_ENV === 'production' ? '30d' : 0,
+    maxAge: env.NODE_ENV === 'production' ? '1y' : 0,
+    immutable: env.NODE_ENV === 'production',
     setHeaders: (res) => {
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
       res.setHeader('Accept-Ranges', 'bytes');
+      if (env.NODE_ENV === 'production') res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     }
   }));
 }
@@ -57,11 +59,12 @@ if (existsSync(uploadsRootDir)) {
   console.log(`Serving DeutschFlow uploads root from ${uploadsRootDir}`);
   app.use('/uploads', express.static(uploadsRootDir, {
     index: false,
-    maxAge: env.NODE_ENV === 'production' ? '30d' : 0,
+    maxAge: env.NODE_ENV === 'production' ? '1y' : 0,
+    immutable: env.NODE_ENV === 'production',
     setHeaders: (res) => {
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
       res.setHeader('Accept-Ranges', 'bytes');
-      res.setHeader('Cache-Control', 'public, max-age=86400');
+      if (env.NODE_ENV === 'production') res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     }
   }));
 }

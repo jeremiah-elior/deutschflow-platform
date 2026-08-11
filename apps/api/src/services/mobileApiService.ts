@@ -146,9 +146,32 @@ function durationMinutes(rawSecondsOrMinutes: number | null | undefined) {
   return Math.max(1, Math.round(value / 60));
 }
 
+
+function durationMilliseconds(rawSecondsOrMinutes: unknown) {
+  const value = Number(rawSecondsOrMinutes ?? 0);
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  // Imported legacy audio rows store values such as 20 for "20 minutes".
+  // New uploads may store true seconds. Keep both forms deterministic.
+  const seconds = value <= 180 ? value * 60 : value;
+  return Math.round(seconds * 1000);
+}
+
+function withVersion(url: string | null, version: string) {
+  if (!url) return null;
+  if (!version) return url;
+  try {
+    const parsed = new URL(url, publicAppBaseUrl() || undefined);
+    parsed.searchParams.set('v', version);
+    return parsed.toString();
+  } catch {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}v=${encodeURIComponent(version)}`;
+  }
+}
+
 function publicAssetUrl(asset: AnyRow | null | undefined) {
   if (!asset) return null;
-  return normalizeMediaUrl(asset.public_url || asset.storage_path || null);
+  return normalizeMediaUrl(asset.storage_path || asset.public_url || null);
 }
 
 function findAsset(chapter: ChapterRow, assetType: string, lang?: string) {
@@ -296,21 +319,147 @@ function levelRowFromChapter(chapter: ChapterRow): LevelRow | undefined {
 export async function getMobileLessons(params: { lang?: unknown; level?: unknown; legacy?: unknown }) {
   const lang = normalizeLanguage(params.lang);
   const requestedLevel = params.level ? String(params.level).trim().toUpperCase() : '';
-  const whereParts = ['co.slug=?', 'co.is_active=1', 'l.is_active=1'];
-  const queryParams: any[] = [DEFAULT_COURSE_SLUG];
-  if (requestedLevel) {
-    whereParts.push('UPPER(l.slug)=UPPER(?)');
-    queryParams.push(requestedLevel);
-  }
 
-  // One base chapter query plus only the three summary relations. No vocabulary,
-  // notes, transcripts or quiz data is touched by the lesson-list endpoint.
-  const chapters = await hydrateChapters(whereParts.join(' AND '), queryParams, true, SUMMARY_RELATIONS) as ChapterRow[];
-  const lessons = chapters
-    .filter((chapter) => hasMobileVisibleContent(chapter, lang))
-    .map((chapter) => buildLessonSummary(chapter, levelRowFromChapter(chapter), lang, false));
+  // V88 core mobile bootstrap: ONE database query returns exactly the metadata
+  // required by Home + Player first paint. No notes/vocabulary/transcript/quiz/video
+  // hydration and no N+1 relation fan-out.
+  //
+  // The selected-language audio asset is authoritative. We intentionally do not
+  // fall back to another language because Telugu/Tamil/Kannada audio can have
+  // different duration/content and resume positions are language-specific.
+  const sql = `
+    SELECT
+      c.id, c.legacy_id, c.slug, c.number, c.title_json, c.description_json,
+      c.duration_seconds, c.is_premium, c.is_featured, c.is_active, c.updated_at,
+      l.slug AS level_slug,
+      cat.name AS category_name, cat.icon AS category_icon,
+      s.title AS series_title, s.cover_url AS series_cover_url,
+      ct.title AS translation_title, ct.audio_url AS translation_audio_url, ct.updated_at AS translation_updated_at,
+      aa.id AS audio_asset_id,
+      aa.storage_path AS audio_storage_path,
+      aa.public_url AS audio_public_url,
+      aa.duration_seconds AS audio_duration_seconds,
+      aa.size_bytes AS audio_size_bytes,
+      aa.sha256 AS audio_sha256,
+      aa.version AS audio_version,
+      aa.updated_at AS audio_updated_at,
+      ca.storage_path AS cover_storage_path,
+      ca.public_url AS cover_public_url,
+      pv.video_url AS video_url,
+      pv.thumbnail_url AS video_thumbnail_url,
+      pv.duration_seconds AS video_duration_seconds,
+      pv.is_premium AS video_is_premium
+    FROM chapters c
+    JOIN course_levels l ON l.id=c.level_id AND l.is_active=1
+    JOIN courses co ON co.id=l.course_id AND co.is_active=1
+    LEFT JOIN course_categories cat ON cat.id=c.category_id
+    LEFT JOIN course_series s ON s.id=c.series_id
+    LEFT JOIN chapter_translations ct
+      ON ct.chapter_id=c.id AND ct.language_code=? AND ct.is_published=1
+    LEFT JOIN chapter_assets aa ON aa.id=(
+      SELECT a2.id FROM chapter_assets a2
+      WHERE a2.chapter_id=c.id
+        AND a2.asset_type='audio'
+        AND a2.language_code=?
+        AND a2.is_active=1
+      ORDER BY a2.updated_at DESC, a2.created_at DESC
+      LIMIT 1
+    )
+    LEFT JOIN chapter_assets ca ON ca.id=(
+      SELECT c2.id FROM chapter_assets c2
+      WHERE c2.chapter_id=c.id
+        AND c2.asset_type='cover'
+        AND c2.is_active=1
+      ORDER BY (c2.language_code IS NULL) DESC, c2.updated_at DESC, c2.created_at DESC
+      LIMIT 1
+    )
+    LEFT JOIN chapter_videos pv ON pv.id=(
+      SELECT v2.id FROM chapter_videos v2
+      WHERE v2.chapter_id=c.id
+        AND v2.is_enabled=1
+        AND (v2.language_code=? OR v2.language_code IS NULL)
+      ORDER BY (v2.language_code=?) DESC, v2.sort_order, v2.updated_at DESC
+      LIMIT 1
+    )
+    WHERE co.slug=? AND c.is_active=1
+      ${requestedLevel ? 'AND UPPER(l.slug)=UPPER(?)' : ''}
+    ORDER BY c.sort_order, c.number`;
+
+  const queryParams: any[] = [lang, lang, lang, lang, DEFAULT_COURSE_SLUG];
+  if (requestedLevel) queryParams.push(requestedLevel);
+  const mobileRows = await rows<any>(sql, queryParams);
+
+  const lessons = mobileRows
+    .map((item) => {
+      const nativeTitle = String(item.translation_title ?? '').trim() || localized(item.title_json, lang);
+      const titleEn = localized(item.title_json, 'en') || String(item.slug ?? '');
+      const title = nativeTitle || titleEn;
+
+      // storage_path is the canonical media identity because it is written by the
+      // upload pipeline. public_url can be stale after a host/domain migration.
+      const audioUrlRaw = item.audio_storage_path || item.audio_public_url || item.translation_audio_url || null;
+      const audioUrl = normalizeMediaUrl(audioUrlRaw);
+      const rawAudioVersion = String(item.audio_version ?? item.audio_updated_at ?? item.audio_sha256 ?? item.translation_updated_at ?? item.updated_at ?? '').trim();
+      const audioVersion = rawAudioVersion || '1';
+      const audioDurationMs = durationMilliseconds(item.audio_duration_seconds ?? item.duration_seconds);
+      const coverUrl = normalizeMediaUrl(item.cover_storage_path || item.cover_public_url || item.series_cover_url || null);
+
+      const hasRealTitle = Boolean(title && !/^chapter\s*\d+$/i.test(title.trim()));
+      const visible = item.legacy_id !== null && item.legacy_id !== undefined
+        ? true
+        : Boolean(nativeTitle || audioUrl || coverUrl || hasRealTitle);
+
+      if (!visible) return null;
+
+      const audio = audioUrl ? {
+        url: withVersion(audioUrl, audioVersion),
+        version: audioVersion,
+        durationMs: audioDurationMs,
+        sizeBytes: Number(item.audio_size_bytes ?? 0) || null,
+        language: lang
+      } : null;
+
+      return {
+        id: item.legacy_id ?? item.id,
+        uuid: item.id,
+        legacyId: item.legacy_id ?? null,
+        slug: item.slug,
+        title,
+        titleNative: nativeTitle,
+        nativeLanguage: lang,
+        titleEn,
+        level: item.level_slug ?? '',
+        category: item.category_name ?? null,
+        categoryIcon: item.category_icon ?? null,
+        series: item.series_title ?? null,
+        durationMinutes: durationMinutes(item.audio_duration_seconds ?? item.duration_seconds),
+        audio,
+        // Keep audioUrl for old mobile builds while V65+ consumes `audio`.
+        audioUrl: audio?.url ?? null,
+        audioVersion: audio?.version ?? null,
+        audioDurationMs: audio?.durationMs ?? 0,
+        coverUrl,
+        manualCoverUrl: coverUrl,
+        videoUrl: normalizeMediaUrl(item.video_url) ?? null,
+        videoThumbnailUrl: normalizeMediaUrl(item.video_thumbnail_url) ?? coverUrl,
+        videoDurationSeconds: Number(item.video_duration_seconds ?? 0),
+        hasVideo: Boolean(normalizeMediaUrl(item.video_url)),
+        videoPremium: Boolean(item.video_is_premium),
+        isPremium: Boolean(item.is_premium),
+        isFeatured: Boolean(item.is_featured),
+        updatedAt: item.updated_at ?? null
+      };
+    })
+    .filter(Boolean);
+
   if (String(params.legacy ?? '') === '1') return lessons;
-  return { success: true, language: lang, lessons };
+  return {
+    success: true,
+    schemaVersion: 2,
+    language: lang,
+    lessons,
+    generatedAt: new Date().toISOString()
+  };
 }
 
 export async function getMobileLessonOverview(id: string, langInput: unknown, fallbackInput?: unknown) {
