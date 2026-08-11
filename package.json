@@ -1,8 +1,8 @@
 {
   "name": "deutschflow-platform",
   "private": true,
-  "version": "0.0.88",
-  "description": "DeutschFlow V88 production backend with one-query language-aware mobile audio bootstrap, resumable iOS playback metadata, MySQL, and Google Read & Speak.",
+  "version": "0.0.89",
+  "description": "DeutschFlow V89 production backend: MySQL chapter_assets is the single audio source, atomic admin save/publish, storage repair, manifest/media verification, and V65 resume compatibility.",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -26,7 +26,9 @@
     "admin:create": "node scripts/create-admin.mjs",
     "build:check": "node scripts/ensure-build.mjs",
     "verify:mobile-audio": "node scripts/verify-mobile-audio.mjs",
-    "db:optimize-mobile": "node scripts/ensure-mobile-indexes.mjs"
+    "db:optimize-mobile": "node scripts/ensure-mobile-indexes.mjs",
+    "repair:audio-assets": "node scripts/repair-audio-assets-from-storage.mjs",
+    "publish:course-manifests": "node scripts/publish-course-manifests.mjs"
   },
   "engines": {
     "node": ">=20.0.0",

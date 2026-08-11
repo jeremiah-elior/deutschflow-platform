@@ -183,15 +183,16 @@ function findAsset(chapter: ChapterRow, assetType: string, lang?: string) {
   return assets.find((asset) => asset.language_code === null || asset.language_code === undefined) ?? assets[0] ?? null;
 }
 
-function getAudioUrl(chapter: ChapterRow, lang: string, fallback = false) {
-  const languageAsset = findAsset(chapter, 'audio', lang);
-  const languageTranslation = getTranslation(chapter, lang);
-  const direct = publicAssetUrl(languageAsset) || languageTranslation?.audio_url || null;
-  if (direct) return normalizeMediaUrl(direct);
-  if (!fallback) return null;
-  const anyAudioAsset = findAsset(chapter, 'audio');
-  const anyTranslation = getAnyTranslation(chapter);
-  return normalizeMediaUrl(publicAssetUrl(anyAudioAsset) || anyTranslation?.audio_url || null);
+function findExactLanguageAsset(chapter: ChapterRow, assetType: string, lang: string) {
+  return (chapter.chapter_assets ?? [])
+    .filter((asset) => Boolean(asset.is_active) && asset.asset_type === assetType && asset.language_code === lang)
+    .sort((a, b) => String(b.updated_at ?? b.created_at ?? '').localeCompare(String(a.updated_at ?? a.created_at ?? '')))[0] ?? null;
+}
+
+function getAudioUrl(chapter: ChapterRow, lang: string, _fallback = false) {
+  // V89: chapter_assets is the only audio source. Never fall back to
+  // chapter_translations.audio_url or to a different language.
+  return normalizeMediaUrl(publicAssetUrl(findExactLanguageAsset(chapter, 'audio', lang)));
 }
 
 function getCoverUrl(chapter: ChapterRow) {
@@ -255,6 +256,17 @@ function buildLessonSummary(chapter: ChapterRow, level: LevelRow | undefined, la
   const coverUrl = getCoverUrl(chapter);
   const primaryVideo = getPrimaryVideo(chapter, lang, fallback);
   const primaryVideoSummary = videoSummary(primaryVideo);
+  const audioAsset = findExactLanguageAsset(chapter, 'audio', lang);
+  const rawAudioUrl = normalizeMediaUrl(publicAssetUrl(audioAsset));
+  const audioVersion = audioAsset?.sha256 ? `sha256:${audioAsset.sha256}` : String(audioAsset?.version ?? audioAsset?.updated_at ?? '1');
+  const audioDurationMs = durationMilliseconds(audioAsset?.duration_seconds ?? chapter.duration_seconds);
+  const audio = rawAudioUrl ? {
+    url: withVersion(rawAudioUrl, audioVersion),
+    version: audioVersion,
+    durationMs: audioDurationMs,
+    sizeBytes: Number(audioAsset?.size_bytes ?? 0) || null,
+    language: lang
+  } : null;
 
   return {
     id: clientLessonId(chapter),
@@ -269,8 +281,11 @@ function buildLessonSummary(chapter: ChapterRow, level: LevelRow | undefined, la
     category: chapter.category?.name ?? null,
     categoryIcon: chapter.category?.icon ?? null,
     series: chapter.series?.title ?? null,
-    durationMinutes: durationMinutes(chapter.duration_seconds),
-    audioUrl: getAudioUrl(chapter, lang, fallback),
+    durationMinutes: durationMinutes(audioAsset?.duration_seconds ?? chapter.duration_seconds),
+    audio,
+    audioUrl: audio?.url ?? null,
+    audioVersion: audio?.version ?? null,
+    audioDurationMs: audio?.durationMs ?? 0,
     coverUrl,
     manualCoverUrl: coverUrl,
     videoUrl: primaryVideoSummary.videoUrl,
@@ -320,7 +335,7 @@ export async function getMobileLessons(params: { lang?: unknown; level?: unknown
   const lang = normalizeLanguage(params.lang);
   const requestedLevel = params.level ? String(params.level).trim().toUpperCase() : '';
 
-  // V88 core mobile bootstrap: ONE database query returns exactly the metadata
+  // V89 core mobile bootstrap: ONE database query returns exactly the metadata
   // required by Home + Player first paint. No notes/vocabulary/transcript/quiz/video
   // hydration and no N+1 relation fan-out.
   //
@@ -334,7 +349,7 @@ export async function getMobileLessons(params: { lang?: unknown; level?: unknown
       l.slug AS level_slug,
       cat.name AS category_name, cat.icon AS category_icon,
       s.title AS series_title, s.cover_url AS series_cover_url,
-      ct.title AS translation_title, ct.audio_url AS translation_audio_url, ct.updated_at AS translation_updated_at,
+      ct.title AS translation_title,
       aa.id AS audio_asset_id,
       aa.storage_path AS audio_storage_path,
       aa.public_url AS audio_public_url,
@@ -397,9 +412,9 @@ export async function getMobileLessons(params: { lang?: unknown; level?: unknown
 
       // storage_path is the canonical media identity because it is written by the
       // upload pipeline. public_url can be stale after a host/domain migration.
-      const audioUrlRaw = item.audio_storage_path || item.audio_public_url || item.translation_audio_url || null;
+      const audioUrlRaw = item.audio_storage_path || null;
       const audioUrl = normalizeMediaUrl(audioUrlRaw);
-      const rawAudioVersion = String(item.audio_version ?? item.audio_updated_at ?? item.audio_sha256 ?? item.translation_updated_at ?? item.updated_at ?? '').trim();
+      const rawAudioVersion = String(item.audio_sha256 ? `sha256:${item.audio_sha256}` : (item.audio_version ?? item.audio_updated_at ?? item.updated_at ?? '')).trim();
       const audioVersion = rawAudioVersion || '1';
       const audioDurationMs = durationMilliseconds(item.audio_duration_seconds ?? item.duration_seconds);
       const coverUrl = normalizeMediaUrl(item.cover_storage_path || item.cover_public_url || item.series_cover_url || null);

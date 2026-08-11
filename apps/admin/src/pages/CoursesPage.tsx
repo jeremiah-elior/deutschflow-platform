@@ -14,7 +14,7 @@ const emptyOptions: Options = { languages: [], courses: [], chapters: [], catego
 const defaultCourse = { id: '', slug: 'german', title: '{"en":"German Course"}', description: '{"en":"A1 to B1 lessons"}', isActive: true };
 const defaultLevel = { id: '', courseId: '', slug: 'A1', title: '{"en":"A1"}', isActive: true };
 const defaultChapter = { id: '', levelId: '', categoryId: '', seriesId: '', slug: 'chapter-01', number: 1, title: '{"en":"Chapter 01"}', isActive: true, isPremium: false, isFeatured: false };
-const defaultAsset = { id: '', chapterId: '', languageCode: 'te', assetType: 'audio', storagePath: '', isActive: true };
+const defaultAsset = { id: '', chapterId: '', languageCode: 'te', assetType: 'audio', storagePath: '', sizeBytes: 0, sha256: '', version: '', isActive: true };
 const pageSize = 8;
 
 function assetChapterText(asset: any) {
@@ -63,7 +63,7 @@ export function CoursesPage() {
   const selectedChapter = useMemo(() => options.chapters.find((chapter) => chapter.id === assetForm.chapterId), [options.chapters, assetForm.chapterId]);
   const selectedLevel = useMemo(() => levels.find((level: any) => level.id === selectedChapter?.levelId || level.id === chapterForm.levelId), [levels, selectedChapter, chapterForm.levelId]);
   const selectedCourse = useMemo(() => courses.find((course) => course.id === selectedChapter?.courseId || course.id === selectedLevel?.courseId), [courses, selectedChapter, selectedLevel]);
-  const currentAsset = useMemo(() => assets.find((asset) => asset.chapter_id === assetForm.chapterId && asset.language_code === assetForm.languageCode && asset.asset_type === assetForm.assetType), [assets, assetForm]);
+  const currentAsset = useMemo(() => assets.find((asset) => asset.chapter_id === assetForm.chapterId && asset.language_code === assetForm.languageCode && asset.asset_type === assetForm.assetType && Boolean(asset.is_active)), [assets, assetForm]);
   const viewingAsset = useMemo(() => assets.find((asset) => asset.id === assetForm.id), [assets, assetForm.id]);
 
   const filteredAssets = useMemo(() => {
@@ -128,14 +128,14 @@ export function CoursesPage() {
   function openAssetView(asset: any) {
     setActiveTab('files');
     setAssetPanelMode('view');
-    setAssetForm({ id: asset.id, chapterId: asset.chapter_id, languageCode: asset.language_code ?? 'te', assetType: asset.asset_type, storagePath: asset.storage_path, isActive: asset.is_active ?? true });
+    setAssetForm({ id: asset.id, chapterId: asset.chapter_id, languageCode: asset.language_code ?? 'te', assetType: asset.asset_type, storagePath: asset.storage_path, sizeBytes: Number(asset.size_bytes ?? 0), sha256: asset.sha256 ?? '', version: asset.version ?? '', isActive: asset.is_active ?? true });
     applyChapterSelection(asset.chapter_id);
   }
 
   function openAssetReplace(asset: any) {
     setActiveTab('files');
     setAssetPanelMode('replace');
-    setAssetForm({ id: asset.id, chapterId: asset.chapter_id, languageCode: asset.language_code ?? 'te', assetType: asset.asset_type, storagePath: '', isActive: asset.is_active ?? true });
+    setAssetForm({ id: asset.id, chapterId: asset.chapter_id, languageCode: asset.language_code ?? 'te', assetType: asset.asset_type, storagePath: '', sizeBytes: 0, sha256: '', version: '', isActive: asset.is_active ?? true });
     applyChapterSelection(asset.chapter_id);
   }
 
@@ -193,16 +193,66 @@ export function CoursesPage() {
     });
   }
 
+  async function persistAsset() {
+    if (!assetForm.chapterId) throw new Error('Choose a chapter first.');
+    if (!assetForm.storagePath) throw new Error('Upload a file first.');
+    const body = {
+      chapterId: assetForm.chapterId,
+      languageCode: assetForm.languageCode,
+      assetType: assetForm.assetType,
+      storagePath: assetForm.storagePath,
+      sizeBytes: assetForm.sizeBytes || null,
+      sha256: assetForm.sha256 || null,
+      version: assetForm.version || (assetForm.sha256 ? `sha256:${assetForm.sha256}` : new Date().toISOString()),
+      isActive: assetForm.isActive
+    };
+    const { data } = assetForm.id
+      ? await api.patch(`/v1/admin/chapter-assets/${assetForm.id}`, body)
+      : await api.post('/v1/admin/chapter-assets', body);
+    return data.asset;
+  }
+
   async function saveAsset() {
     await run(assetForm.id ? 'Updating chapter file…' : 'Saving chapter file…', async () => {
-      if (!assetForm.chapterId) throw new Error('Choose a chapter first.');
-      if (!assetForm.storagePath) throw new Error('Upload a file first.');
-      const body = { chapterId: assetForm.chapterId, languageCode: assetForm.languageCode, assetType: assetForm.assetType, storagePath: assetForm.storagePath, isActive: assetForm.isActive, version: new Date().toISOString() };
-      const { data } = assetForm.id ? await api.patch(`/v1/admin/chapter-assets/${assetForm.id}`, body) : await api.post('/v1/admin/chapter-assets', body);
-      const saved = data.asset;
+      const saved = await persistAsset();
       setMessage('Chapter file saved. Publish the level manifest so the mobile app receives it.');
-      setAssetForm({ id: saved?.id ?? assetForm.id, chapterId: assetForm.chapterId, languageCode: assetForm.languageCode, assetType: assetForm.assetType, storagePath: saved?.storage_path ?? assetForm.storagePath, isActive: saved?.is_active ?? assetForm.isActive });
+      setAssetForm({
+        id: saved?.id ?? assetForm.id,
+        chapterId: assetForm.chapterId,
+        languageCode: assetForm.languageCode,
+        assetType: assetForm.assetType,
+        storagePath: saved?.storage_path ?? assetForm.storagePath,
+        sizeBytes: Number(saved?.size_bytes ?? assetForm.sizeBytes ?? 0),
+        sha256: saved?.sha256 ?? assetForm.sha256,
+        version: saved?.version ?? assetForm.version,
+        isActive: saved?.is_active ?? assetForm.isActive
+      });
       setAssetPanelMode('view');
+      await load();
+    });
+  }
+
+  async function saveAndPublishAsset() {
+    if (!selectedChapter?.course || !selectedChapter?.level) {
+      setError('Choose a chapter first, then save and publish.');
+      return;
+    }
+    await run('Saving file and publishing manifest…', async () => {
+      const saved = await persistAsset();
+      const { data } = await api.post(`/v1/admin/courses/${selectedChapter.course}/levels/${selectedChapter.level}/publish`, { languageCode: assetForm.languageCode });
+      setAssetForm({
+        id: saved?.id ?? assetForm.id,
+        chapterId: assetForm.chapterId,
+        languageCode: assetForm.languageCode,
+        assetType: assetForm.assetType,
+        storagePath: saved?.storage_path ?? assetForm.storagePath,
+        sizeBytes: Number(saved?.size_bytes ?? assetForm.sizeBytes ?? 0),
+        sha256: saved?.sha256 ?? assetForm.sha256,
+        version: saved?.version ?? assetForm.version,
+        isActive: saved?.is_active ?? assetForm.isActive
+      });
+      setAssetPanelMode('view');
+      setMessage(`Saved file and published ${selectedChapter.level} ${assetForm.languageCode.toUpperCase()} manifest: ${data.url}`);
       await load();
     });
   }
@@ -230,7 +280,7 @@ export function CoursesPage() {
       const levelSlug = selectedChapter.level || selectedLevel?.slug || 'level';
       const folder = `courses/${courseSlug}/${levelSlug}/${selectedChapter.slug}/${assetForm.assetType}/${assetForm.languageCode}`;
       const upload = await signUpload(new File([file], `${assetForm.assetType}.${ext}`, { type: file.type }), folder);
-      setAssetForm({ ...assetForm, id: assetForm.id || currentAsset?.id || '', storagePath: upload.storagePath });
+      setAssetForm({ ...assetForm, id: assetForm.id || currentAsset?.id || '', storagePath: upload.storagePath, sizeBytes: Number(upload.sizeBytes ?? 0), sha256: upload.sha256 ?? '', version: upload.version ?? '' });
       setAssetPanelMode(assetForm.id || currentAsset?.id ? 'replace' : 'add');
       setMessage(`Uploaded ${file.name}. Click Save asset to link it to ${chapterLabel(selectedChapter)}.`);
     });
@@ -376,12 +426,12 @@ export function CoursesPage() {
                   </div>
                   <div className="inspectorActions">
                     <AsyncButton type="button" className="primaryButton" busy={busy} busyLabel="Saving…" onClick={saveAsset}>Save asset</AsyncButton>
-                    <AsyncButton type="button" className="secondaryButton" busy={busy} busyLabel="Publishing…" onClick={publishSelectedAssetManifest}>Save done, publish manifest</AsyncButton>
+                    <AsyncButton type="button" className="secondaryButton" busy={busy} busyLabel="Publishing…" onClick={saveAndPublishAsset}>Save & publish</AsyncButton>
                   </div>
                 </>
               )}
 
-              <div className="infoBox inspectorHelp">After saving, publish the level manifest. The mobile app will fetch the new audio/file from the manifest.</div>
+              <div className="infoBox inspectorHelp">Audio/files are saved to MySQL chapter_assets first. Save & publish performs both steps in order so the manifest cannot publish an unsaved replacement.</div>
             </div>
           </aside>
         </div>

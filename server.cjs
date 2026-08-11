@@ -4,7 +4,7 @@ const { existsSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { pathToFileURL } = require('node:url');
 
-const VERSION = 'V88_MOBILE_AUDIO_RESUME_CORE_2026_08_11';
+const VERSION = 'V89_MYSQL_SINGLE_AUDIO_SOURCE_2026_08_11';
 const compiledServer = resolve(process.cwd(), 'apps/api/dist/server.js');
 const adminIndex = resolve(process.cwd(), 'dist/index.html');
 

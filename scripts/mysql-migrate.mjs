@@ -34,7 +34,7 @@ try {
     await conn.query(`ALTER TABLE \`${table}\` ADD INDEX \`${indexName}\` (${columnsSql})`);
   }
 
-  // V88 mobile audio bootstrap indexes. These make the selected-language audio/video
+  // V89 mobile audio bootstrap indexes. These make the selected-language audio/video
   // lookups deterministic and fast without adding extra API queries.
   await ensureIndex('chapter_assets', 'idx_chapter_assets_mobile', '`chapter_id`,`asset_type`,`language_code`,`is_active`,`updated_at`');
   await ensureIndex('chapter_videos', 'idx_chapter_videos_mobile', '`chapter_id`,`language_code`,`is_enabled`,`sort_order`,`updated_at`');

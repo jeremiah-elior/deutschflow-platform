@@ -36,7 +36,7 @@ try {
   await ensureIndex('chapter_assets', 'idx_chapter_assets_mobile', '`chapter_id`,`asset_type`,`language_code`,`is_active`,`updated_at`');
   await ensureIndex('chapter_videos', 'idx_chapter_videos_mobile', '`chapter_id`,`language_code`,`is_enabled`,`sort_order`,`updated_at`');
   await ensureIndex('chapters', 'idx_chapters_mobile', '`level_id`,`is_active`,`sort_order`,`number`');
-  console.log('DeutschFlow V88 mobile indexes ready.');
+  console.log('DeutschFlow V89 mobile indexes ready.');
 } finally {
   await conn.end();
 }

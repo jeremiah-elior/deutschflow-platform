@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { extname } from 'node:path';
 import { z } from 'zod';
 import { saveStorageFile, publicUrl } from '../utils/storage.js';
@@ -22,10 +22,13 @@ export async function storeAdminUpload(file: Express.Multer.File, folderInput: s
   const name = `${Date.now()}_${randomBytes(4).toString('hex')}_${base}${originalExt}`;
   const storagePath = `${folder}/${name}`;
   await saveStorageFile(storagePath, file.buffer);
+  const sha256 = createHash('sha256').update(file.buffer).digest('hex');
   return {
     storagePath,
     publicUrl: publicUrl(storagePath),
     contentType: file.mimetype || 'application/octet-stream',
-    sizeBytes: file.size
+    sizeBytes: file.size,
+    sha256,
+    version: `sha256:${sha256}`
   };
 }
