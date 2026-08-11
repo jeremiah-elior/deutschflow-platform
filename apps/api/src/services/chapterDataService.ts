@@ -11,6 +11,39 @@ function groupBy(items: any[], key: string) {
   return map;
 }
 
+export type ChapterRelations = {
+  translations?: boolean;
+  assets?: boolean;
+  notes?: boolean;
+  transcripts?: boolean;
+  vocabulary?: boolean;
+  videos?: boolean;
+  quiz?: boolean;
+};
+
+const ALL_RELATIONS: Required<ChapterRelations> = {
+  translations: true,
+  assets: true,
+  notes: true,
+  transcripts: true,
+  vocabulary: true,
+  videos: true,
+  quiz: true
+};
+
+function relationFlags(relations?: ChapterRelations): Required<ChapterRelations> {
+  if (!relations) return ALL_RELATIONS;
+  return {
+    translations: Boolean(relations.translations),
+    assets: Boolean(relations.assets),
+    notes: Boolean(relations.notes),
+    transcripts: Boolean(relations.transcripts),
+    vocabulary: Boolean(relations.vocabulary),
+    videos: Boolean(relations.videos),
+    quiz: Boolean(relations.quiz)
+  };
+}
+
 export async function getCourseBySlug(slug: string, activeOnly = false) {
   return row<any>(`SELECT * FROM courses WHERE slug=? ${activeOnly ? 'AND is_active=1' : ''} LIMIT 1`, [slug]);
 }
@@ -24,7 +57,23 @@ export async function getLevels(courseId: string, levelSlug?: string, activeOnly
   return rows<any>(sql, params);
 }
 
-export async function hydrateChapters(whereSql = '1=1', params: any[] = [], activeOnly = false) {
+/**
+ * Hydrate only the relations the caller actually needs.
+ *
+ * V86 always loaded translations, assets, notes, transcripts, vocabulary,
+ * videos and quiz rows for every mobile request. A lightweight lesson-list or
+ * overview call therefore executed the same heavy query fan-out as a full
+ * lesson detail request. V87 keeps the full behavior as the default for admin/
+ * compatibility callers, while mobile endpoints explicitly request only the
+ * relations they consume.
+ */
+export async function hydrateChapters(
+  whereSql = '1=1',
+  params: any[] = [],
+  activeOnly = false,
+  relations?: ChapterRelations
+) {
+  const include = relationFlags(relations);
   let sql = `SELECT c.*, cat.id AS cat_id, cat.name AS cat_name, cat.icon AS cat_icon, cat.description AS cat_description,
     s.id AS series_rel_id, s.title AS series_title, s.subtitle AS series_subtitle, s.cover_url AS series_cover_url,
     l.slug AS level_slug, l.title_json AS level_title_json, l.course_id, co.slug AS course_slug, co.title_json AS course_title_json
@@ -36,27 +85,41 @@ export async function hydrateChapters(whereSql = '1=1', params: any[] = [], acti
     WHERE ${whereSql}`;
   if (activeOnly) sql += ' AND c.is_active=1';
   sql += ' ORDER BY c.sort_order, c.number';
+
   const base = await rows<any>(sql, params);
   if (!base.length) return [];
+
   const ids = base.map((x) => x.id);
   const ph = placeholders(ids);
+  const empty = Promise.resolve([] as any[]);
+
   const [translations, assets, notes, transcripts, vocab, videos, quiz] = await Promise.all([
-    rows<any>(`SELECT * FROM chapter_translations WHERE chapter_id IN (${ph}) ORDER BY created_at`, ids),
-    rows<any>(`SELECT * FROM chapter_assets WHERE chapter_id IN (${ph}) ORDER BY created_at`, ids),
-    rows<any>(`SELECT * FROM chapter_notes WHERE chapter_id IN (${ph}) ORDER BY updated_at DESC`, ids),
-    rows<any>(`SELECT * FROM chapter_transcripts WHERE chapter_id IN (${ph}) ORDER BY sort_order`, ids),
-    rows<any>(`SELECT * FROM chapter_vocabulary WHERE chapter_id IN (${ph}) ORDER BY sort_order`, ids),
-    rows<any>(`SELECT * FROM chapter_videos WHERE chapter_id IN (${ph}) ORDER BY sort_order`, ids),
-    rows<any>(`SELECT * FROM chapter_quiz_questions WHERE chapter_id IN (${ph}) ORDER BY sort_order`, ids)
+    include.translations ? rows<any>(`SELECT * FROM chapter_translations WHERE chapter_id IN (${ph}) ORDER BY created_at`, ids) : empty,
+    include.assets ? rows<any>(`SELECT * FROM chapter_assets WHERE chapter_id IN (${ph}) ORDER BY created_at`, ids) : empty,
+    include.notes ? rows<any>(`SELECT * FROM chapter_notes WHERE chapter_id IN (${ph}) ORDER BY updated_at DESC`, ids) : empty,
+    include.transcripts ? rows<any>(`SELECT * FROM chapter_transcripts WHERE chapter_id IN (${ph}) ORDER BY sort_order`, ids) : empty,
+    include.vocabulary ? rows<any>(`SELECT * FROM chapter_vocabulary WHERE chapter_id IN (${ph}) ORDER BY sort_order`, ids) : empty,
+    include.videos ? rows<any>(`SELECT * FROM chapter_videos WHERE chapter_id IN (${ph}) ORDER BY sort_order`, ids) : empty,
+    include.quiz ? rows<any>(`SELECT * FROM chapter_quiz_questions WHERE chapter_id IN (${ph}) ORDER BY sort_order`, ids) : empty
   ]);
+
   const vocabIds = vocab.map((x) => x.id);
-  const vocabTranslations = vocabIds.length ? await rows<any>(`SELECT * FROM chapter_vocabulary_translations WHERE vocabulary_id IN (${placeholders(vocabIds)})`, vocabIds) : [];
+  const vocabTranslations = include.vocabulary && vocabIds.length
+    ? await rows<any>(`SELECT * FROM chapter_vocabulary_translations WHERE vocabulary_id IN (${placeholders(vocabIds)})`, vocabIds)
+    : [];
   const vt = groupBy(vocabTranslations, 'vocabulary_id');
   for (const v of vocab) v.translations = vt.get(String(v.id)) ?? [];
+
   const maps = {
-    chapter_translations: groupBy(translations, 'chapter_id'), chapter_assets: groupBy(assets, 'chapter_id'), chapter_notes: groupBy(notes, 'chapter_id'),
-    chapter_transcripts: groupBy(transcripts, 'chapter_id'), chapter_vocabulary: groupBy(vocab, 'chapter_id'), chapter_videos: groupBy(videos, 'chapter_id'), chapter_quiz_questions: groupBy(quiz, 'chapter_id')
+    chapter_translations: groupBy(translations, 'chapter_id'),
+    chapter_assets: groupBy(assets, 'chapter_id'),
+    chapter_notes: groupBy(notes, 'chapter_id'),
+    chapter_transcripts: groupBy(transcripts, 'chapter_id'),
+    chapter_vocabulary: groupBy(vocab, 'chapter_id'),
+    chapter_videos: groupBy(videos, 'chapter_id'),
+    chapter_quiz_questions: groupBy(quiz, 'chapter_id')
   };
+
   return base.map((c) => ({
     ...c,
     category: c.cat_id ? { id: c.cat_id, name: c.cat_name, icon: c.cat_icon, description: c.cat_description } : null,
@@ -72,7 +135,7 @@ export async function hydrateChapters(whereSql = '1=1', params: any[] = [], acti
   }));
 }
 
-export async function getHydratedChapterByClientId(id: string) {
-  if (/^\d+$/.test(id)) return (await hydrateChapters('c.legacy_id=?', [Number(id)]))[0] ?? null;
-  return (await hydrateChapters('c.id=?', [id]))[0] ?? null;
+export async function getHydratedChapterByClientId(id: string, relations?: ChapterRelations) {
+  if (/^\d+$/.test(id)) return (await hydrateChapters('c.legacy_id=?', [Number(id)], false, relations))[0] ?? null;
+  return (await hydrateChapters('c.id=?', [id], false, relations))[0] ?? null;
 }

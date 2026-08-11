@@ -12,7 +12,7 @@ import { adminRoutes } from './routes/adminRoutes.js';
 
 const app = express();
 
-const VERSION = 'V82_MYSQL_GOOGLE_SPEECH_2026_08_08';
+const VERSION = 'V87_MYSQL_FAST_MOBILE_API_2026_08_11';
 console.log(`DeutschFlow API ${VERSION}`);
 
 app.use(helmet({

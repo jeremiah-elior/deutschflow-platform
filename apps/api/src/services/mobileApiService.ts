@@ -1,5 +1,5 @@
 import { rows } from '../config/db.js';
-import { getCourseBySlug, getLevels, hydrateChapters, getHydratedChapterByClientId } from './chapterDataService.js';
+import { getCourseBySlug, getLevels, hydrateChapters, getHydratedChapterByClientId, type ChapterRelations } from './chapterDataService.js';
 import { HttpError } from '../utils/http.js';
 
 type AnyRow = Record<string, any>;
@@ -24,6 +24,7 @@ type ChapterRow = {
   id: string;
   legacy_id?: number | null;
   level_id?: string | null;
+  level_slug?: string | null;
   slug: string;
   number?: number | null;
   title_json?: AnyRow | null;
@@ -49,6 +50,7 @@ type ChapterRow = {
 const SUPPORTED_APP_LANGS = new Set(['te', 'ta', 'kn']);
 const DEFAULT_COURSE_SLUG = 'german';
 const RETIRED_MEDIA_HOSTS = new Set(['silver-llama-257051.hostingersite.com', 'deutsch.berlinpulse.eu']);
+const SUMMARY_RELATIONS: ChapterRelations = { translations: true, assets: true, videos: true };
 
 function publicAppBaseUrl() {
   const explicit = process.env.PUBLIC_APP_BASE_URL || '';
@@ -268,14 +270,14 @@ async function getLevelsForCourse(courseId: string, levelSlug?: string) {
   return (await getLevels(courseId, levelSlug, true)) as LevelRow[];
 }
 
-async function getChaptersForLevels(levelIds: string[]) {
+async function getChaptersForLevels(levelIds: string[], relations?: ChapterRelations) {
   if (!levelIds.length) return [] as ChapterRow[];
   const placeholders = levelIds.map(() => '?').join(',');
-  return (await hydrateChapters(`c.level_id IN (${placeholders})`, levelIds, true)) as ChapterRow[];
+  return (await hydrateChapters(`c.level_id IN (${placeholders})`, levelIds, true, relations)) as ChapterRow[];
 }
 
-async function getChapterByClientId(id: string) {
-  const chapter = await getHydratedChapterByClientId(id) as ChapterRow | null;
+async function getChapterByClientId(id: string, relations?: ChapterRelations) {
+  const chapter = await getHydratedChapterByClientId(id, relations) as ChapterRow | null;
   if (!chapter) throw new HttpError(404, 'lesson_not_found');
   return chapter;
 }
@@ -285,16 +287,28 @@ async function getLevelMap(courseId: string) {
   return new Map(levels.map((level) => [level.id, level]));
 }
 
+function levelRowFromChapter(chapter: ChapterRow): LevelRow | undefined {
+  const slug = String(chapter.level_slug ?? '').trim();
+  if (!slug) return undefined;
+  return { id: String(chapter.level_id ?? slug), slug };
+}
+
 export async function getMobileLessons(params: { lang?: unknown; level?: unknown; legacy?: unknown }) {
   const lang = normalizeLanguage(params.lang);
-  const requestedLevel = params.level ? String(params.level).toUpperCase() : undefined;
-  const course = await getGermanCourse();
-  const levels = await getLevelsForCourse(course.id, requestedLevel);
-  const levelMap = new Map(levels.map((level) => [level.id, level]));
-  const chapters = await getChaptersForLevels(levels.map((level) => level.id));
+  const requestedLevel = params.level ? String(params.level).trim().toUpperCase() : '';
+  const whereParts = ['co.slug=?', 'co.is_active=1', 'l.is_active=1'];
+  const queryParams: any[] = [DEFAULT_COURSE_SLUG];
+  if (requestedLevel) {
+    whereParts.push('UPPER(l.slug)=UPPER(?)');
+    queryParams.push(requestedLevel);
+  }
+
+  // One base chapter query plus only the three summary relations. No vocabulary,
+  // notes, transcripts or quiz data is touched by the lesson-list endpoint.
+  const chapters = await hydrateChapters(whereParts.join(' AND '), queryParams, true, SUMMARY_RELATIONS) as ChapterRow[];
   const lessons = chapters
     .filter((chapter) => hasMobileVisibleContent(chapter, lang))
-    .map((chapter) => buildLessonSummary(chapter, levelMap.get(String(chapter.level_id)), lang, false));
+    .map((chapter) => buildLessonSummary(chapter, levelRowFromChapter(chapter), lang, false));
   if (String(params.legacy ?? '') === '1') return lessons;
   return { success: true, language: lang, lessons };
 }
@@ -302,17 +316,15 @@ export async function getMobileLessons(params: { lang?: unknown; level?: unknown
 export async function getMobileLessonOverview(id: string, langInput: unknown, fallbackInput?: unknown) {
   const lang = normalizeLanguage(langInput);
   const fallback = String(fallbackInput ?? '') === '1';
-  const course = await getGermanCourse();
-  const levelMap = await getLevelMap(course.id);
-  const chapter = await getChapterByClientId(id);
-  const overview = buildLessonSummary(chapter, levelMap.get(String(chapter.level_id)), lang, fallback);
+  const chapter = await getChapterByClientId(id, SUMMARY_RELATIONS);
+  const overview = buildLessonSummary(chapter, levelRowFromChapter(chapter), lang, fallback);
   const isFallback = fallback && !getTranslation(chapter, lang) && Boolean(getAnyTranslation(chapter));
   return { success: true, language: lang, lessonId: clientLessonId(chapter), ...(isFallback ? { fallbackLanguage: getAnyTranslation(chapter)?.language_code, isFallback: true } : {}), overview };
 }
 export async function getMobileLessonVideos(id: string, langInput: unknown, fallbackInput?: unknown) {
   const lang = normalizeLanguage(langInput);
   const fallback = String(fallbackInput ?? '') === '1';
-  const chapter = await getChapterByClientId(id);
+  const chapter = await getChapterByClientId(id, { videos: true });
   const videos = (chapter.chapter_videos ?? [])
     .filter((video) => videoMatches(video, lang, fallback))
     .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))
@@ -343,7 +355,7 @@ function vocabularyNative(vocab: AnyRow, lang: string, fallback: boolean) {
 export async function getMobileLessonVocabulary(id: string, langInput: unknown, fallbackInput?: unknown) {
   const lang = normalizeLanguage(langInput);
   const fallback = String(fallbackInput ?? '') === '1';
-  const chapter = await getChapterByClientId(id);
+  const chapter = await getChapterByClientId(id, { vocabulary: true });
   const vocabulary = (chapter.chapter_vocabulary ?? [])
     .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))
     .map((vocab) => ({
@@ -367,7 +379,7 @@ export async function getMobileLessonVocabulary(id: string, langInput: unknown, 
 export async function getMobileLessonNotes(id: string, langInput: unknown, fallbackInput?: unknown) {
   const lang = normalizeLanguage(langInput);
   const fallback = String(fallbackInput ?? '') === '1';
-  const chapter = await getChapterByClientId(id);
+  const chapter = await getChapterByClientId(id, { notes: true });
   const languageNote = (chapter.chapter_notes ?? []).find((note) => note.language_code === lang);
   const fallbackNote = fallback ? (chapter.chapter_notes ?? []).find((note) => note.content) : null;
   const notesNative = languageNote?.content || fallbackNote?.content || localized(chapter.notes_json, lang) || (fallback ? localized(chapter.notes_json, 'te') : '');
@@ -418,7 +430,7 @@ function parseTranscriptContent(content: string, fallbackId: string, languageCod
 export async function getMobileLessonTranscript(id: string, langInput: unknown, fallbackInput?: unknown) {
   const lang = normalizeLanguage(langInput);
   const fallback = String(fallbackInput ?? '') === '1';
-  const chapter = await getChapterByClientId(id);
+  const chapter = await getChapterByClientId(id, { transcripts: true });
   const transcriptRows = (chapter.chapter_transcripts ?? [])
     .filter((row) => row.language_code === lang || row.language_code === 'de' || fallback)
     .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0));
@@ -453,7 +465,7 @@ function quizMatches(quiz: AnyRow, lang: string, fallback: boolean) {
 export async function getMobileLessonQuiz(id: string, langInput: unknown, fallbackInput?: unknown) {
   const lang = normalizeLanguage(langInput);
   const fallback = String(fallbackInput ?? '') === '1';
-  const chapter = await getChapterByClientId(id);
+  const chapter = await getChapterByClientId(id, { quiz: true });
   const quiz = (chapter.chapter_quiz_questions ?? [])
     .filter((item) => quizMatches(item, lang, fallback))
     .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))

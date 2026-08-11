@@ -1,8 +1,8 @@
 {
   "name": "deutschflow-platform",
   "private": true,
-  "version": "0.0.86",
-  "description": "DeutschFlow V86 production backend with MySQL, Google Read & Speak, validated WAV recognition, and explicit provider error handling.",
+  "version": "0.0.87",
+  "description": "DeutschFlow V87 production backend with fast relation-scoped mobile APIs, MySQL, and Google Read & Speak.",
   "workspaces": [
     "apps/*",
     "packages/*"
