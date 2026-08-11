@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { execute, insertRow, row, rows, updateRow, deleteRow } from '../config/db.js';
 import { publicUrl } from '../utils/storage.js';
 
-const Uuid=z.string().uuid();const LocalizedJson=z.record(z.string(),z.string().nullable()).default({});const AnyJson=z.record(z.string(),z.any()).default({});
+const Uuid=z.string().uuid();const Booleanish=z.preprocess((value)=>value===1||value==='1'?true:value===0||value==='0'?false:value,z.boolean());const LocalizedJson=z.record(z.string(),z.string().nullable()).default({});const AnyJson=z.record(z.string(),z.any()).default({});
 function titleFromJson(v:any,f='Untitled'){if(!v||typeof v!=='object')return f;return v.en||v.de||v.te||v.ta||v.kn||Object.values(v).find(Boolean)||f;}
 function snakePatch(input:Record<string,any>,map:Record<string,string>){const o:Record<string,any>={};for(const [a,b] of Object.entries(map))if(Object.prototype.hasOwnProperty.call(input,a))o[b]=input[a];return o;}
 
@@ -19,7 +19,7 @@ export const VocabularyInput=z.object({chapterId:Uuid,german:z.string().min(1),e
 export const NoteInput=z.object({chapterId:Uuid,languageCode:z.string().min(2),content:z.string().min(1)});export const NotePatchInput=NoteInput.partial();
 export const VideoInput=z.object({chapterId:Uuid,title:z.string().min(1).default('Video Overview'),videoUrl:z.string().min(1),thumbnailUrl:z.string().nullable().optional(),durationSeconds:z.number().int().nonnegative().default(0),isEnabled:z.boolean().default(true),isPremium:z.boolean().default(false),showAsPreview:z.boolean().default(false),sortOrder:z.number().int().default(0)});export const VideoPatchInput=VideoInput.partial();
 export const QuizInput=z.object({chapterId:Uuid,sourceTable:z.string().default('admin'),question:z.string().min(1),options:AnyJson,correctOption:z.string().min(1),explanation:z.string().nullable().optional(),sortOrder:z.number().int().default(0),isActive:z.boolean().default(true)});export const QuizPatchInput=QuizInput.partial();
-export const AssetPatchInput=z.object({chapterId:Uuid.optional(),languageCode:z.string().nullable().optional(),assetType:z.string().min(1).optional(),storagePath:z.string().min(1).optional(),durationSeconds:z.number().int().nonnegative().nullable().optional(),sizeBytes:z.number().int().nonnegative().nullable().optional(),sha256:z.string().nullable().optional(),version:z.string().optional(),isActive:z.boolean().optional()});
+export const AssetPatchInput=z.object({chapterId:Uuid.optional(),languageCode:z.string().nullable().optional(),assetType:z.string().min(1).optional(),storagePath:z.string().min(1).optional(),durationSeconds:z.number().int().nonnegative().nullable().optional(),sizeBytes:z.number().int().nonnegative().nullable().optional(),sha256:z.string().nullable().optional(),version:z.string().optional(),isActive:Booleanish.optional()});
 
 export async function updateCourse(id:string,input:z.infer<typeof CoursePatchInput>){return updateRow('courses',id,snakePatch(CoursePatchInput.parse(input),{slug:'slug',title:'title_json',description:'description_json',isActive:'is_active',sortOrder:'sort_order'}));}export const deleteCourse=(id:string)=>deleteRow('courses',id);
 export async function updateLevel(id:string,input:z.infer<typeof LevelPatchInput>){return updateRow('course_levels',id,snakePatch(LevelPatchInput.parse(input),{courseId:'course_id',slug:'slug',title:'title_json',description:'description_json',isActive:'is_active',sortOrder:'sort_order'}));}export const deleteLevel=(id:string)=>deleteRow('course_levels',id);

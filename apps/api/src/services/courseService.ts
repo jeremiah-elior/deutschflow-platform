@@ -7,11 +7,12 @@ import { publicUrl, storageAbsolutePath, uploadTextFile } from '../utils/storage
 import { getCourseBySlug, getLevels, hydrateChapters } from './chapterDataService.js';
 
 const LocalizedJson = z.record(z.string(), z.string().nullable()).default({});
+const Booleanish = z.preprocess((value) => value === 1 || value === '1' ? true : value === 0 || value === '0' ? false : value, z.boolean());
 export const LanguageInput = z.object({ code:z.string().min(2).max(10), name:z.string().min(1), nativeName:z.string().optional().nullable(), isActive:z.boolean().default(true), sortOrder:z.number().int().default(0) });
 export const CourseInput = z.object({ slug:z.string().min(1), title:LocalizedJson, description:LocalizedJson.optional(), isActive:z.boolean().default(true), sortOrder:z.number().int().default(0) });
 export const LevelInput = z.object({ courseId:z.string().uuid(), slug:z.string().min(1), title:LocalizedJson, description:LocalizedJson.optional(), isActive:z.boolean().default(true), sortOrder:z.number().int().default(0) });
 export const ChapterInput = z.object({ levelId:z.string().uuid(), slug:z.string().min(1), number:z.number().int().positive(), title:LocalizedJson, description:LocalizedJson.optional(), isActive:z.boolean().default(true), sortOrder:z.number().int().default(0) });
-export const ChapterAssetInput = z.object({ chapterId:z.string().uuid(), languageCode:z.string().min(2).nullable().optional(), assetType:z.string().min(1), storagePath:z.string().min(1), durationSeconds:z.number().int().nonnegative().optional().nullable(), sizeBytes:z.number().int().nonnegative().optional().nullable(), sha256:z.string().optional().nullable(), version:z.string().default('1'), isActive:z.boolean().default(true) });
+export const ChapterAssetInput = z.object({ chapterId:z.string().uuid(), languageCode:z.string().min(2).nullable().optional(), assetType:z.string().min(1), storagePath:z.string().min(1), durationSeconds:z.number().int().nonnegative().optional().nullable(), sizeBytes:z.number().int().nonnegative().optional().nullable(), sha256:z.string().optional().nullable(), version:z.string().default('1'), isActive:Booleanish.default(true) });
 
 
 function stripLegacyTranslationAudio(translation:any){

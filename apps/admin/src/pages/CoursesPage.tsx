@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Eye, Plus, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react';
+import { Eye, Plus, RefreshCw, Search, SlidersHorizontal } from 'lucide-react';
 import { api, signUpload } from '../api/client';
 import { FileUploadBox } from '../components/FileUploadBox';
 import { AsyncButton, BusyOverlay, ConfirmBar, Drawer, EmptyState, PageNotice } from '../components/AdminUi';
@@ -40,6 +40,7 @@ export function CoursesPage() {
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [selectedLevelId, setSelectedLevelId] = useState('');
   const [assetPanelMode, setAssetPanelMode] = useState<AssetPanelMode>('add');
+  const [assetDrawerOpen, setAssetDrawerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('files');
   const [drawer, setDrawer] = useState<DrawerMode>(null);
   const [pendingDelete, setPendingDelete] = useState<{ path: string; id: string; label: string } | null>(null);
@@ -123,20 +124,23 @@ export function CoursesPage() {
     setAssetForm(defaultAsset);
     setSelectedCourseId('');
     setSelectedLevelId('');
+    setAssetDrawerOpen(true);
   }
 
   function openAssetView(asset: any) {
     setActiveTab('files');
     setAssetPanelMode('view');
-    setAssetForm({ id: asset.id, chapterId: asset.chapter_id, languageCode: asset.language_code ?? 'te', assetType: asset.asset_type, storagePath: asset.storage_path, sizeBytes: Number(asset.size_bytes ?? 0), sha256: asset.sha256 ?? '', version: asset.version ?? '', isActive: asset.is_active ?? true });
+    setAssetForm({ id: asset.id, chapterId: asset.chapter_id, languageCode: asset.language_code ?? 'te', assetType: asset.asset_type, storagePath: asset.storage_path, sizeBytes: Number(asset.size_bytes ?? 0), sha256: asset.sha256 ?? '', version: asset.version ?? '', isActive: Boolean(asset.is_active ?? true) });
     applyChapterSelection(asset.chapter_id);
+    setAssetDrawerOpen(true);
   }
 
   function openAssetReplace(asset: any) {
     setActiveTab('files');
     setAssetPanelMode('replace');
-    setAssetForm({ id: asset.id, chapterId: asset.chapter_id, languageCode: asset.language_code ?? 'te', assetType: asset.asset_type, storagePath: '', sizeBytes: 0, sha256: '', version: '', isActive: asset.is_active ?? true });
+    setAssetForm({ id: asset.id, chapterId: asset.chapter_id, languageCode: asset.language_code ?? 'te', assetType: asset.asset_type, storagePath: '', sizeBytes: 0, sha256: '', version: '', isActive: Boolean(asset.is_active ?? true) });
     applyChapterSelection(asset.chapter_id);
+    setAssetDrawerOpen(true);
   }
 
   function openCreateCourse() { setCourseForm(defaultCourse); setDrawer('course'); }
@@ -188,7 +192,7 @@ export function CoursesPage() {
       await api.delete(`${item.path}/${item.id}`);
       setPendingDelete(null);
       setMessage(`${item.label} deleted.`);
-      if (item.label === 'asset') openAssetAdd();
+      if (item.label === 'asset') { setAssetDrawerOpen(false); setAssetForm(defaultAsset); }
       await load();
     });
   }
@@ -204,7 +208,7 @@ export function CoursesPage() {
       sizeBytes: assetForm.sizeBytes || null,
       sha256: assetForm.sha256 || null,
       version: assetForm.version || (assetForm.sha256 ? `sha256:${assetForm.sha256}` : new Date().toISOString()),
-      isActive: assetForm.isActive
+      isActive: Boolean(assetForm.isActive)
     };
     const { data } = assetForm.id
       ? await api.patch(`/v1/admin/chapter-assets/${assetForm.id}`, body)
@@ -225,7 +229,7 @@ export function CoursesPage() {
         sizeBytes: Number(saved?.size_bytes ?? assetForm.sizeBytes ?? 0),
         sha256: saved?.sha256 ?? assetForm.sha256,
         version: saved?.version ?? assetForm.version,
-        isActive: saved?.is_active ?? assetForm.isActive
+        isActive: Boolean(saved?.is_active ?? assetForm.isActive)
       });
       setAssetPanelMode('view');
       await load();
@@ -237,10 +241,13 @@ export function CoursesPage() {
       setError('Choose a chapter first, then save and publish.');
       return;
     }
-    await run('Saving file and publishing manifest…', async () => {
+
+    setError('');
+    setMessage('');
+    setBusyLabel('Saving file…');
+    try {
       const saved = await persistAsset();
-      const { data } = await api.post(`/v1/admin/courses/${selectedChapter.course}/levels/${selectedChapter.level}/publish`, { languageCode: assetForm.languageCode });
-      setAssetForm({
+      const nextForm = {
         id: saved?.id ?? assetForm.id,
         chapterId: assetForm.chapterId,
         languageCode: assetForm.languageCode,
@@ -249,12 +256,25 @@ export function CoursesPage() {
         sizeBytes: Number(saved?.size_bytes ?? assetForm.sizeBytes ?? 0),
         sha256: saved?.sha256 ?? assetForm.sha256,
         version: saved?.version ?? assetForm.version,
-        isActive: saved?.is_active ?? assetForm.isActive
-      });
+        isActive: Boolean(saved?.is_active ?? assetForm.isActive)
+      };
+      setAssetForm(nextForm);
       setAssetPanelMode('view');
-      setMessage(`Saved file and published ${selectedChapter.level} ${assetForm.languageCode.toUpperCase()} manifest: ${data.url}`);
       await load();
-    });
+
+      setBusyLabel('Publishing manifest…');
+      try {
+        const { data } = await api.post(`/v1/admin/courses/${selectedChapter.course}/levels/${selectedChapter.level}/publish`, { languageCode: assetForm.languageCode });
+        setMessage(`File saved and ${selectedChapter.level} ${assetForm.languageCode.toUpperCase()} manifest published: ${data.url}`);
+      } catch (publishError) {
+        const publishMessage = publishError instanceof Error ? publishError.message : 'Manifest publish failed';
+        setError(`File was saved successfully, but the manifest was not published. ${publishMessage}`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to save chapter file');
+    } finally {
+      setBusyLabel('');
+    }
   }
 
   async function publish(courseSlug: string, levelSlug: string, languageCode = 'te') {
@@ -310,17 +330,17 @@ export function CoursesPage() {
       {pendingDelete ? <ConfirmBar title={`Delete ${pendingDelete.label}?`} body="This cannot be undone." busy={busy} onCancel={() => setPendingDelete(null)} onConfirm={confirmDelete} /> : null}
 
       <div className="courseTabs panelFlush">
-        <button className={activeTab === 'levels' ? 'active' : ''} onClick={() => setActiveTab('levels')}>Courses & levels</button>
+        <button className={activeTab === 'levels' ? 'active' : ''} onClick={() => { setActiveTab('levels'); setAssetDrawerOpen(false); }}>Courses & levels</button>
         <button className={activeTab === 'files' ? 'active' : ''} onClick={() => setActiveTab('files')}>Chapter files</button>
       </div>
 
       {activeTab === 'files' ? (
-        <div className="assetWorkspace">
-          <div className="assetMainPanel panel">
+        <>
+<div className="assetMainPanel panel">
             <div className="assetTopBar">
               <div>
                 <h2>Chapter files</h2>
-                <span className="muted">View, replace, delete, and publish files while keeping the list visible.</span>
+                <span className="muted">View, replace, delete, and publish chapter files. Open an item to work in the slide-over panel.</span>
               </div>
               <button className="primaryButton" onClick={openAssetAdd}><Plus size={16} /> Add New</button>
             </div>
@@ -335,7 +355,7 @@ export function CoursesPage() {
             </div>
 
             {loading ? <div className="tableLoading">Loading chapter files…</div> : null}
-            {!loading && !filteredAssets.length ? <EmptyState title="No files found" body="Upload the first chapter audio/file from the side panel." /> : null}
+            {!loading && !filteredAssets.length ? <EmptyState title="No files found" body="Use Add New to upload the first chapter audio/file." /> : null}
 
             {filteredAssets.length ? (
               <div className="assetTableWrap productionTableWrap">
@@ -348,7 +368,7 @@ export function CoursesPage() {
                         <td><span className="statusBadge good">{asset.asset_type}</span></td>
                         <td>{asset.language_code ?? '—'}</td>
                         <td><small className="pathText">{asset.storage_path}</small></td>
-                        <td>{timestamp(asset.created_at)}</td>
+                        <td>{timestamp(asset.updated_at ?? asset.created_at)}</td>
                         <td>
                           <div className="rowActions noWrapActions">
                             <button onClick={() => openAssetView(asset)}><Eye size={14} /> View</button>
@@ -374,26 +394,36 @@ export function CoursesPage() {
             </div>
           </div>
 
-          <aside className="sideInspector">
-            <div className="inspectorHeader">
-              <div>
-                <h2>{panelTitle}</h2>
-                <p>{assetPanelMode === 'view' ? 'Review the selected file without leaving the list.' : 'Upload or replace chapter audio/file.'}</p>
+
+          <Drawer
+            open={assetDrawerOpen}
+            title={panelTitle}
+            subtitle={assetPanelMode === 'view' ? 'Review the selected file while the chapter list stays visible.' : 'Upload or replace a chapter file, then save or publish it.'}
+            onClose={() => setAssetDrawerOpen(false)}
+            panelClassName="assetDrawerPanel"
+            footer={assetPanelMode === 'view' ? (
+              <>
+                <button type="button" onClick={() => viewingAsset && openAssetReplace(viewingAsset)}>Replace file</button>
+                <AsyncButton type="button" className="primaryButton" busy={busy} busyLabel="Publishing…" onClick={publishSelectedAssetManifest}>Publish manifest</AsyncButton>
+              </>
+            ) : (
+              <>
+                <AsyncButton type="button" busy={busy} busyLabel="Saving…" onClick={saveAsset}>Save asset</AsyncButton>
+                <AsyncButton type="button" className="primaryButton" busy={busy} busyLabel="Publishing…" onClick={saveAndPublishAsset}>Save & publish</AsyncButton>
+              </>
+            )}
+          >
+            <div className="assetDrawerContent">
+              <div className="miniStepper">
+                <div className={assetForm.chapterId ? 'done' : 'active'}><strong>1. Select</strong><span>Course, level, chapter</span></div>
+                <div className={assetForm.storagePath ? 'done' : ''}><strong>2. Upload</strong><span>File</span></div>
+                <div><strong>3. Save</strong><span>Attach to chapter</span></div>
+                <div><strong>4. Publish</strong><span>Update app</span></div>
               </div>
-              <button className="iconButton" onClick={openAssetAdd} title="Reset side panel"><X size={18} /></button>
-            </div>
 
-            <div className="miniStepper">
-              <div className={assetForm.chapterId ? 'done' : 'active'}><strong>1. Select</strong><span>Course, level, chapter</span></div>
-              <div className={assetForm.storagePath ? 'done' : ''}><strong>2. Upload</strong><span>File</span></div>
-              <div><strong>3. Save</strong><span>Attach to chapter</span></div>
-              <div><strong>4. Publish</strong><span>Update app</span></div>
-            </div>
-
-            <div className="inspectorBody">
               <div className="formGrid3">
-                <label>Course<select disabled={!canEditAssetFields} value={selectedCourseId} onChange={(e) => { setSelectedCourseId(e.target.value); setSelectedLevelId(''); setAssetForm({ ...assetForm, chapterId: '' }); }}><option value="">All courses</option>{courses.map((course) => <option key={course.id} value={course.id}>{course.slug}</option>)}</select></label>
-                <label>Level<select disabled={!canEditAssetFields} value={selectedLevelId} onChange={(e) => { setSelectedLevelId(e.target.value); setAssetForm({ ...assetForm, chapterId: '' }); }}><option value="">All levels</option>{levelsForAssetSelection.map((level: any) => <option key={level.id} value={level.id}>{level.slug}</option>)}</select></label>
+                <label>Course<select disabled={!canEditAssetFields} value={selectedCourseId} onChange={(e) => { setSelectedCourseId(e.target.value); setSelectedLevelId(''); setAssetForm({ ...assetForm, chapterId: '' }); }}><option value="">Select course</option>{courses.map((course) => <option key={course.id} value={course.id}>{course.slug}</option>)}</select></label>
+                <label>Level<select disabled={!canEditAssetFields} value={selectedLevelId} onChange={(e) => { setSelectedLevelId(e.target.value); setAssetForm({ ...assetForm, chapterId: '' }); }}><option value="">Select level</option>{levelsForAssetSelection.map((level: any) => <option key={level.id} value={level.id}>{level.slug}</option>)}</select></label>
                 <label>Chapter<select disabled={!canEditAssetFields} value={assetForm.chapterId} onChange={(e) => setAssetForm({ ...assetForm, chapterId: e.target.value })}><option value="">Select chapter</option>{selectableChapters.map((chapter) => <option key={chapter.id} value={chapter.id}>{chapterLabel(chapter)}</option>)}</select></label>
               </div>
 
@@ -410,10 +440,6 @@ export function CoursesPage() {
                   <span>Status: {assetForm.isActive ? 'Active' : 'Inactive'}</span>
                   <span className="pathText">{assetForm.storagePath}</span>
                   {viewingAsset?.public_url ? <a className="primaryButton asLink" href={viewingAsset.public_url} target="_blank" rel="noreferrer">Open file</a> : null}
-                  <div className="buttonRow">
-                    <button type="button" onClick={() => viewingAsset && openAssetReplace(viewingAsset)}>Replace file</button>
-                    <button type="button" onClick={publishSelectedAssetManifest}>Publish manifest</button>
-                  </div>
                 </div>
               ) : (
                 <>
@@ -422,19 +448,15 @@ export function CoursesPage() {
                     <strong>{selectedChapter ? chapterLabel(selectedChapter) : 'Select a chapter to continue'}</strong>
                     <span className="muted">Current: {currentAsset ? <a className="tableLink" href={currentAsset.public_url} target="_blank" rel="noreferrer">Open existing asset</a> : 'No existing file for this choice'}</span>
                     <span className="pathText">{assetForm.storagePath || 'Upload file to generate storage path'}</span>
-                    <label className="inlineCheck"><input type="checkbox" checked={assetForm.isActive} onChange={(e) => setAssetForm({ ...assetForm, isActive: e.target.checked })} /> Active in app</label>
-                  </div>
-                  <div className="inspectorActions">
-                    <AsyncButton type="button" className="primaryButton" busy={busy} busyLabel="Saving…" onClick={saveAsset}>Save asset</AsyncButton>
-                    <AsyncButton type="button" className="secondaryButton" busy={busy} busyLabel="Publishing…" onClick={saveAndPublishAsset}>Save & publish</AsyncButton>
+                    <label className="inlineCheck"><input type="checkbox" checked={Boolean(assetForm.isActive)} onChange={(e) => setAssetForm({ ...assetForm, isActive: e.target.checked })} /> Active in app</label>
                   </div>
                 </>
               )}
 
-              <div className="infoBox inspectorHelp">Audio/files are saved to MySQL chapter_assets first. Save & publish performs both steps in order so the manifest cannot publish an unsaved replacement.</div>
+              <div className="infoBox inspectorHelp">The upload is stored first. Save links that exact file to chapter_assets; Save & publish then updates the level manifest.</div>
             </div>
-          </aside>
-        </div>
+          </Drawer>
+        </>
       ) : (
         <div className="panel">
           <div className="listHeader"><h2>Courses & levels</h2><button className="secondaryButton" onClick={openCreateCourse}>Add course</button></div>

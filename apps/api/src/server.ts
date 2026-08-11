@@ -12,7 +12,7 @@ import { adminRoutes } from './routes/adminRoutes.js';
 
 const app = express();
 
-const VERSION = 'V89_MYSQL_SINGLE_AUDIO_SOURCE_2026_08_11';
+const VERSION = 'V90_ADMIN_ASSET_DRAWER_FIX_2026_08_12';
 console.log(`DeutschFlow API ${VERSION}`);
 
 app.use(helmet({

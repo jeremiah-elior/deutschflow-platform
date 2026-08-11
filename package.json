@@ -1,8 +1,8 @@
 {
   "name": "deutschflow-platform",
   "private": true,
-  "version": "0.0.89",
-  "description": "DeutschFlow V89 production backend: MySQL chapter_assets is the single audio source, atomic admin save/publish, storage repair, manifest/media verification, and V65 resume compatibility.",
+  "version": "0.0.90",
+  "description": "DeutschFlow V90 production backend: chapter-asset save compatibility, clearer validation errors, and right-side slide-over asset management.",
   "workspaces": [
     "apps/*",
     "packages/*"

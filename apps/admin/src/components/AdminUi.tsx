@@ -18,11 +18,11 @@ export function AsyncButton({ busy, busyLabel = 'Working…', children, disabled
   return <button {...props} disabled={disabled || busy}>{busy ? <><span className="tinySpinner" /> {busyLabel}</> : children}</button>;
 }
 
-export function Drawer({ open, title, subtitle, onClose, children, footer }: { open: boolean; title: string; subtitle?: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
+export function Drawer({ open, title, subtitle, onClose, children, footer, panelClassName = '' }: { open: boolean; title: string; subtitle?: string; onClose: () => void; children: ReactNode; footer?: ReactNode; panelClassName?: string }) {
   if (!open) return null;
   return (
     <div className="drawerBackdrop" onMouseDown={onClose}>
-      <aside className="drawerPanel" onMouseDown={(event) => event.stopPropagation()}>
+      <aside className={`drawerPanel ${panelClassName}`.trim()} onMouseDown={(event) => event.stopPropagation()}>
         <div className="drawerHeader">
           <div>
             <h2>{title}</h2>

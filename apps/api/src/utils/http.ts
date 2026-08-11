@@ -20,7 +20,10 @@ export const asyncHandler = (fn: (req: Request, res: Response, next: NextFunctio
 
 export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
   if (err instanceof ZodError) {
-    return res.status(400).json({ error: 'validation_error', message: 'Invalid request payload', issues: err.issues });
+    const firstIssue = err.issues[0];
+    const issuePath = firstIssue?.path?.length ? firstIssue.path.join('.') : 'payload';
+    const issueMessage = firstIssue?.message ?? 'invalid value';
+    return res.status(400).json({ error: 'validation_error', message: `Invalid request payload: ${issuePath}: ${issueMessage}`, issues: err.issues });
   }
 
   if (err instanceof HttpError) {
