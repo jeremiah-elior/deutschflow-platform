@@ -12,7 +12,7 @@ import { adminRoutes } from './routes/adminRoutes.js';
 
 const app = express();
 
-const VERSION = 'V90_ADMIN_ASSET_DRAWER_FIX_2026_08_12';
+const VERSION = 'V91_READ_SPEAK_SYNC_STT_FIX_2026_08_12';
 console.log(`DeutschFlow API ${VERSION}`);
 
 app.use(helmet({

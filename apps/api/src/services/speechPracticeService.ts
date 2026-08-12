@@ -21,10 +21,12 @@ export type ReadingPracticeAsset = {
   audioUrl: string;
   voice: string;
   speakingRate: number;
+  playbackRate: number;
+  timingVersion: number;
   words: ReadingWordTiming[];
 };
 
-const readingContent: Record<string, Omit<ReadingPracticeAsset, 'audioUrl' | 'voice' | 'speakingRate' | 'words'>> = {
+const readingContent: Record<string, Omit<ReadingPracticeAsset, 'audioUrl' | 'voice' | 'speakingRate' | 'playbackRate' | 'timingVersion' | 'words'>> = {
   '1': {
     lessonId: '1',
     title: 'Unterwegs nach Berlin',
@@ -274,22 +276,133 @@ function inspectWav(audio: Buffer): WavInfo {
   return info;
 }
 
-function recognitionEncoding(mimeType = '', filename = ''): GoogleSpeechEncoding | undefined {
+type RecognitionHints = {
+  encoding?: GoogleSpeechEncoding;
+  sampleRateHertz?: number;
+  audioChannelCount?: number;
+};
+
+function recognitionHints(mimeType = '', filename = '', wavInfo?: WavInfo): RecognitionHints {
   const mime = mimeType.trim().toLowerCase();
   const name = filename.trim().toLowerCase();
 
-  // WAV/FLAC contain their own format headers. Google Speech can derive the encoding from
-  // those headers; specifying a mismatched encoding causes INVALID_ARGUMENT.
-  if (isWavUpload(mimeType, filename) || isFlacUpload(mimeType, filename)) return undefined;
-  if (mime === 'audio/mpeg' || mime === 'audio/mp3' || name.endsWith('.mp3')) return 'MP3';
-  return undefined;
+  // iOS records a validated PCM WAV. Once the RIFF header has been parsed successfully,
+  // send Google the exact format instead of asking the provider to infer it. This avoids
+  // the production INVALID_ARGUMENT "bad encoding" regression seen with V85-V90.
+  if (isWavUpload(mimeType, filename) && wavInfo) {
+    return {
+      encoding: 'LINEAR16',
+      sampleRateHertz: wavInfo.sampleRate,
+      audioChannelCount: wavInfo.channels
+    };
+  }
+  if (isFlacUpload(mimeType, filename)) return { encoding: 'FLAC' };
+  if (mime === 'audio/mpeg' || mime === 'audio/mp3' || name.endsWith('.mp3')) return { encoding: 'MP3' };
+  return {};
 }
 
-async function transcribeWithWordTimings(audio: Buffer, expectedWords: string[] = [], encoding?: GoogleSpeechEncoding) {
+function normalizeTimingWord(value: string) {
+  return value
+    .toLocaleLowerCase('de-DE')
+    .normalize('NFKC')
+    .replace(/[^\p{L}\p{N}äöüß]+/gu, '');
+}
+
+function alignTimingsToExpectedWords(expectedWords: string[], recognizedWords: ReadingWordTiming[]): ReadingWordTiming[] {
+  if (!expectedWords.length || !recognizedWords.length) return [];
+
+  const expected = expectedWords.map(normalizeTimingWord);
+  const recognized = recognizedWords.map((item) => normalizeTimingWord(item.word));
+  const n = expected.length;
+  const m = recognized.length;
+
+  // LCS aligns provider words back to the exact displayed source word sequence. The iOS
+  // highlighter can therefore use the returned array index directly without drifting after
+  // a skipped/repeated STT word.
+  const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = 1; i <= n; i += 1) {
+    for (let j = 1; j <= m; j += 1) {
+      dp[i][j] = expected[i - 1] && expected[i - 1] === recognized[j - 1]
+        ? dp[i - 1][j - 1] + 1
+        : Math.max(dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+
+  const mapped = new Array<number | null>(n).fill(null);
+  let i = n;
+  let j = m;
+  while (i > 0 && j > 0) {
+    if (expected[i - 1] && expected[i - 1] === recognized[j - 1]) {
+      mapped[i - 1] = j - 1;
+      i -= 1;
+      j -= 1;
+    } else if (dp[i - 1][j] >= dp[i][j - 1]) {
+      i -= 1;
+    } else {
+      j -= 1;
+    }
+  }
+
+  const result: Array<ReadingWordTiming | null> = mapped.map((recognizedIndex, expectedIndex) => {
+    if (recognizedIndex == null) return null;
+    const source = recognizedWords[recognizedIndex];
+    return {
+      word: expectedWords[expectedIndex],
+      startMs: source.startMs,
+      endMs: Math.max(source.endMs, source.startMs + 80),
+      confidence: source.confidence
+    };
+  });
+
+  // Fill occasional STT omissions by distributing them inside the real timing gap between
+  // surrounding matched words. This keeps one timing entry per displayed source word.
+  let cursor = 0;
+  while (cursor < result.length) {
+    if (result[cursor]) {
+      cursor += 1;
+      continue;
+    }
+    const runStart = cursor;
+    while (cursor < result.length && !result[cursor]) cursor += 1;
+    const runEnd = cursor - 1;
+    const count = runEnd - runStart + 1;
+    const previous = runStart > 0 ? result[runStart - 1] : null;
+    const next = cursor < result.length ? result[cursor] : null;
+
+    const left = previous?.endMs ?? 0;
+    const right = next?.startMs ?? (left + Math.max(220, count * 260));
+    const available = Math.max(count * 80, right - left);
+    const step = available / count;
+
+    for (let k = 0; k < count; k += 1) {
+      const startMs = Math.max(0, Math.round(left + step * k));
+      const endMs = Math.max(startMs + 80, Math.round(left + step * (k + 1)));
+      result[runStart + k] = {
+        word: expectedWords[runStart + k],
+        startMs,
+        endMs: next ? Math.min(endMs, next.startMs) : endMs
+      };
+    }
+  }
+
+  // Enforce monotonic starts after interpolation/provider rounding.
+  let previousStart = 0;
+  return result.map((item, index) => {
+    const value = item!;
+    const startMs = index === 0 ? Math.max(0, value.startMs) : Math.max(previousStart + 1, value.startMs);
+    const endMs = Math.max(startMs + 80, value.endMs);
+    previousStart = startMs;
+    return { ...value, word: expectedWords[index], startMs, endMs };
+  });
+}
+
+async function transcribeWithWordTimings(audio: Buffer, expectedWords: string[] = [], hints: RecognitionHints = {}) {
   const speechContexts = expectedWords.length ? [{ phrases: expectedWords.slice(0, 200), boost: 12 }] : undefined;
   const response = await googlePost('stt', 'https://speech.googleapis.com/v1/speech:recognize', {
     config: {
-      ...(encoding ? { encoding } : {}),
+      ...(hints.encoding ? { encoding: hints.encoding } : {}),
+      ...(hints.sampleRateHertz ? { sampleRateHertz: hints.sampleRateHertz } : {}),
+      ...(hints.audioChannelCount ? { audioChannelCount: hints.audioChannelCount } : {}),
       languageCode: 'de-DE',
       enableAutomaticPunctuation: true,
       enableWordTimeOffsets: true,
@@ -324,29 +437,45 @@ export async function getReadingPracticeAsset(lessonId: string): Promise<Reading
   if (!content) throw new HttpError(404, 'reading_practice_not_found');
 
   const paths = readingCachePaths(lessonId);
-  if (existsSync(paths.audioPath) && existsSync(paths.metaPath)) {
+  const chirpUsesLocalPlaybackRate = /-Chirp3-HD-/i.test(env.GOOGLE_TTS_VOICE);
+  const playbackRate = chirpUsesLocalPlaybackRate ? env.GOOGLE_TTS_SPEAKING_RATE : 1.0;
+  const timingVersion = 2;
+
+  let cachedMeta: any = null;
+  if (existsSync(paths.metaPath)) {
     try {
-      const cached = JSON.parse(await readFile(paths.metaPath, 'utf8'));
-      const sameVoice = cached.voice === env.GOOGLE_TTS_VOICE;
-      const sameRate = Math.abs(Number(cached.speakingRate ?? 0) - env.GOOGLE_TTS_SPEAKING_RATE) < 0.0001;
-      if (sameVoice && sameRate) {
-        return { ...content, ...cached, audioUrl: paths.audioUrl };
-      }
+      cachedMeta = JSON.parse(await readFile(paths.metaPath, 'utf8'));
     } catch (error) {
       console.warn('Reading practice cache metadata could not be read; regenerating.', error);
     }
   }
 
+  const sameVoice = cachedMeta?.voice === env.GOOGLE_TTS_VOICE;
+  const sameRate = Math.abs(Number(cachedMeta?.speakingRate ?? 0) - env.GOOGLE_TTS_SPEAKING_RATE) < 0.0001;
+  const sameSynthesis = sameVoice && (chirpUsesLocalPlaybackRate || sameRate);
+  const sameTimingVersion = Number(cachedMeta?.timingVersion ?? 0) === timingVersion;
+
+  if (existsSync(paths.audioPath) && cachedMeta && sameSynthesis && sameTimingVersion) {
+    return { ...content, ...cachedMeta, playbackRate, timingVersion, audioUrl: paths.audioUrl };
+  }
+
   await mkdir(paths.absoluteDir, { recursive: true });
   const fullText = content.paragraphs.join('\n\n');
-  const audio = await synthesizeReading(fullText);
-  await writeFile(paths.audioPath, audio);
+  let audio: Buffer;
+  if (existsSync(paths.audioPath) && sameSynthesis) {
+    // V91 timing migration: keep the exact narration MP3 already in production and rebuild
+    // only reading_de.json. This avoids changing the learner audio just to repair highlighting.
+    audio = await readFile(paths.audioPath);
+  } else {
+    audio = await synthesizeReading(fullText);
+    await writeFile(paths.audioPath, audio);
+  }
 
   let words: ReadingWordTiming[] = [];
   try {
     const expectedWords = fullText.match(/[\p{L}\p{N}ÄÖÜäöüß]+/gu) ?? [];
-    const timed = await transcribeWithWordTimings(audio, expectedWords, 'MP3');
-    words = timed.words;
+    const timed = await transcribeWithWordTimings(audio, expectedWords, { encoding: 'MP3' });
+    words = alignTimingsToExpectedWords(expectedWords, timed.words);
   } catch (error) {
     // The narration is still useful if timing generation temporarily fails.
     console.warn('Reading word timing generation failed:', error);
@@ -355,6 +484,8 @@ export async function getReadingPracticeAsset(lessonId: string): Promise<Reading
   const meta = {
     voice: env.GOOGLE_TTS_VOICE,
     speakingRate: env.GOOGLE_TTS_SPEAKING_RATE,
+    playbackRate,
+    timingVersion,
     words
   };
   await writeFile(paths.metaPath, JSON.stringify(meta, null, 2), 'utf8');
@@ -366,13 +497,11 @@ export async function recognizeReadingAudio(audio: Buffer, expectedText: string,
   if (!audio.length) throw new HttpError(400, 'audio_required');
   if (audio.length > env.SPEECH_UPLOAD_MAX_BYTES) throw new HttpError(413, 'audio_too_large');
 
-  if (isWavUpload(mimeType, filename)) {
-    inspectWav(audio);
-  }
+  const wavInfo = isWavUpload(mimeType, filename) ? inspectWav(audio) : undefined;
 
   const phrases = expectedText.match(/[\p{L}\p{N}ÄÖÜäöüß]+/gu) ?? [];
-  const encoding = recognitionEncoding(mimeType, filename);
-  const result = await transcribeWithWordTimings(audio, phrases, encoding);
+  const hints = recognitionHints(mimeType, filename, wavInfo);
+  const result = await transcribeWithWordTimings(audio, phrases, hints);
 
   return {
     transcript: result.transcript,

@@ -1,8 +1,8 @@
 {
   "name": "deutschflow-platform",
   "private": true,
-  "version": "0.0.90",
-  "description": "DeutschFlow V90 production backend: chapter-asset save compatibility, clearer validation errors, and right-side slide-over asset management.",
+  "version": "0.0.91",
+  "description": "DeutschFlow V91 production backend: Read & Speak timing alignment, A1 playback-rate metadata, and explicit iOS WAV STT configuration, retaining V90 admin fixes.",
   "workspaces": [
     "apps/*",
     "packages/*"
